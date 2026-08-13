@@ -12,8 +12,9 @@
 - Next.js app + design system
 - Marketing landing (brand-first)
 - App shell: Mission Control, Approvals, Analytics routes
-- Mission Control **UI with mock run data** (visual contract for Phase 2)
+- Mission Control **UI with mock run data** + step replay
 - Prisma schema (models only; DB connect next)
+- `docker compose` for Postgres + Redis
 
 **Out**
 

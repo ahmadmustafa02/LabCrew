@@ -28,10 +28,14 @@ See [docs/PHASES.md](./docs/PHASES.md) and [docs/DESIGN.md](./docs/DESIGN.md).
 
 ```bash
 npm install
+cp .env.example .env   # Windows: copy .env.example .env
+docker compose up -d   # Postgres + Redis
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+Phase 1 UI runs with mock data even if Docker is down. Database seed and BullMQ workers come next.
 
 ## Product rules
 
