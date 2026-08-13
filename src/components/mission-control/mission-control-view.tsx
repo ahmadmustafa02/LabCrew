@@ -1,18 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useOpsRunReplay } from "@/hooks/use-ops-run-replay";
 import {
   DEMO_PROGRAM,
   MOCK_EXCEPTIONS,
   MOCK_RUN,
   MOCK_STATS,
-  type MockStep,
+  type StepStatus,
 } from "@/lib/mock-data";
 import { cn } from "@/lib/cn";
 
-function statusStyles(status: MockStep["status"]) {
+function statusStyles(status: StepStatus) {
   if (status === "succeeded") {
     return "bg-[var(--lc-success-soft)] text-lc-success";
   }
@@ -25,18 +25,14 @@ function statusStyles(status: MockStep["status"]) {
   return "bg-black/[0.04] text-lc-muted";
 }
 
+function badgeCopy(badge: "idle" | "running" | "succeeded") {
+  if (badge === "running") return "Running";
+  if (badge === "succeeded") return "Succeeded";
+  return "Idle";
+}
+
 export function MissionControlView() {
-  const [busy, setBusy] = useState(false);
-  const [pulse, setPulse] = useState(0);
-
-  const steps = useMemo(() => MOCK_RUN.steps, []);
-
-  async function handleRun() {
-    setBusy(true);
-    setPulse((n) => n + 1);
-    await new Promise((r) => setTimeout(r, 900));
-    setBusy(false);
-  }
+  const { steps, badge, busy, runId, showExceptions, start } = useOpsRunReplay();
 
   return (
     <div className="space-y-8">
@@ -54,11 +50,11 @@ export function MissionControlView() {
         <Button
           variant="accent"
           size="lg"
-          onClick={handleRun}
+          onClick={start}
           disabled={busy}
           className="shrink-0"
         >
-          {busy ? "Starting run…" : "Run weekly ops"}
+          {busy ? "Crew running…" : "Run weekly ops"}
         </Button>
       </div>
 
@@ -85,25 +81,40 @@ export function MissionControlView() {
                 Agent timeline
               </h2>
               <p className="mt-0.5 font-mono text-xs text-lc-muted">
-                {MOCK_RUN.id} · {MOCK_RUN.startedAt} · {MOCK_RUN.duration}
+                {runId} · {MOCK_RUN.startedAt}
+                {badge === "succeeded" ? ` · ${MOCK_RUN.duration}` : ""}
               </p>
             </div>
             <span
-              key={pulse}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--lc-success-soft)] px-2.5 py-1 text-xs font-medium text-lc-success"
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+                badge === "running" &&
+                  "bg-[var(--lc-accent-soft)] text-lc-accent",
+                badge === "succeeded" &&
+                  "bg-[var(--lc-success-soft)] text-lc-success",
+                badge === "idle" && "bg-black/[0.04] text-lc-muted",
+              )}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-lc-success" />
-              Succeeded
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full",
+                  badge === "running" && "bg-lc-accent animate-pulse",
+                  badge === "succeeded" && "bg-lc-success",
+                  badge === "idle" && "bg-lc-muted",
+                )}
+              />
+              {badgeCopy(badge)}
             </span>
           </div>
 
           <ol className="divide-y divide-[var(--lc-line)]">
-            {steps.map((step, index) => (
+            {steps.map((step) => (
               <li
                 key={step.id}
                 className={cn(
-                  "flex gap-4 px-5 py-4 transition-colors",
-                  busy && index === 0 && "bg-[var(--lc-accent-soft)]",
+                  "flex gap-4 px-5 py-4 transition-colors duration-200",
+                  step.status === "running" && "bg-[var(--lc-accent-soft)]",
+                  step.status === "pending" && "opacity-45",
                 )}
               >
                 <div className="w-14 shrink-0 pt-0.5 font-mono text-xs text-lc-muted">
@@ -138,33 +149,39 @@ export function MissionControlView() {
                 Only people who need a decision
               </p>
             </div>
-            <ul className="divide-y divide-[var(--lc-line)]">
-              {MOCK_EXCEPTIONS.map((item) => (
-                <li key={item.id} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-lc-ink">
-                        {item.name}
-                      </p>
-                      <p className="mt-1 text-sm text-lc-muted">{item.reason}</p>
-                      <p className="mt-1 text-xs text-lc-muted">
-                        {item.milestone}
-                      </p>
+            {showExceptions ? (
+              <ul className="divide-y divide-[var(--lc-line)]">
+                {MOCK_EXCEPTIONS.map((item) => (
+                  <li key={item.id} className="px-5 py-4 lc-animate-in">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-lc-ink">
+                          {item.name}
+                        </p>
+                        <p className="mt-1 text-sm text-lc-muted">{item.reason}</p>
+                        <p className="mt-1 text-xs text-lc-muted">
+                          {item.milestone}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium",
+                          item.severity === "high"
+                            ? "bg-[var(--lc-danger-soft)] text-lc-danger"
+                            : "bg-[var(--lc-warn-soft)] text-lc-warn",
+                        )}
+                      >
+                        {item.severity}
+                      </span>
                     </div>
-                    <span
-                      className={cn(
-                        "shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium",
-                        item.severity === "high"
-                          ? "bg-[var(--lc-danger-soft)] text-lc-danger"
-                          : "bg-[var(--lc-warn-soft)] text-lc-warn",
-                      )}
-                    >
-                      {item.severity}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="px-5 py-10 text-sm text-lc-muted">
+                Waiting for Referee to finish scoring…
+              </div>
+            )}
           </div>
 
           <div className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5">
@@ -172,12 +189,13 @@ export function MissionControlView() {
               Director briefing
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-lc-muted">
-              Cohort is mostly healthy. Three students need attention before
-              Wednesday standup. Three Coach drafts are waiting on Approvals.
+              {showExceptions
+                ? "Cohort is mostly healthy. Three students need attention before Wednesday standup. Three Coach drafts are waiting on Approvals."
+                : "Clerk will assemble the Monday packet when the crew finishes."}
             </p>
             <div className="mt-4">
               <Link href="/app/approvals">
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" disabled={!showExceptions}>
                   Review drafts
                 </Button>
               </Link>
