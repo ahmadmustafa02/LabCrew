@@ -51,6 +51,11 @@ export async function executeWeeklyOps(runId: string) {
       agent: AgentName.PULSE,
       title: "Collected cohort signals",
       run: async () => {
+        // SUBMITTED and SCORED both count as "turned in" (SCORED is post-Referee).
+        const turnedIn = {
+          in: [SubmissionStatus.SUBMITTED, SubmissionStatus.SCORED],
+        };
+
         const [students, submissions, activeMilestone] = await Promise.all([
           prisma.member.count({
             where: { programId, role: MemberRole.STUDENT },
@@ -58,7 +63,7 @@ export async function executeWeeklyOps(runId: string) {
           prisma.submission.count({
             where: {
               member: { programId },
-              status: SubmissionStatus.SUBMITTED,
+              status: turnedIn,
             },
           }),
           prisma.milestone.findFirst({
@@ -73,7 +78,7 @@ export async function executeWeeklyOps(runId: string) {
             submissions: {
               none: {
                 milestoneId: activeMilestone?.id,
-                status: SubmissionStatus.SUBMITTED,
+                status: turnedIn,
               },
             },
           },
@@ -98,7 +103,7 @@ export async function executeWeeklyOps(runId: string) {
           where: { programId, status: MilestoneStatus.ACTIVE },
         });
         if (!activeMilestone) {
-          return { detail: "No active milestone — nothing to score" };
+          return { detail: "No active milestone - nothing to score" };
         }
 
         const rows = await prisma.submission.findMany({
@@ -114,7 +119,8 @@ export async function executeWeeklyOps(runId: string) {
 
         for (const row of rows) {
           const name = row.member.user.name;
-          if (row.status !== SubmissionStatus.SUBMITTED) {
+          // Only DRAFT (or empty turn-in) is "missing". SCORED can be re-evaluated.
+          if (row.status === SubmissionStatus.DRAFT) {
             missing += 1;
             exceptions.push({
               name,

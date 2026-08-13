@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MOCK_EXCEPTIONS,
   MOCK_RUN,
+  MOCK_STATS,
   type MockStep,
   type StepStatus,
 } from "@/lib/mock-data";
@@ -16,6 +17,13 @@ type LiveException = {
 };
 
 type LiveMode = "live" | "demo";
+
+type RunStats = {
+  onTrack: number;
+  students: number;
+  exceptions: number;
+  draftNudges: number;
+};
 
 function mapAgentLabel(agent: string) {
   const key = agent.toLowerCase();
@@ -36,6 +44,13 @@ function normalizeStatus(status: string): StepStatus {
   return "pending";
 }
 
+const DEFAULT_STATS: RunStats = {
+  onTrack: 9,
+  students: 12,
+  exceptions: 3,
+  draftNudges: 3,
+};
+
 export function useLiveOpsRun() {
   const demo = useOpsRunReplay();
   const [mode, setMode] = useState<LiveMode>("demo");
@@ -51,6 +66,7 @@ export function useLiveOpsRun() {
     useState<LiveException[]>(MOCK_EXCEPTIONS);
   const [showExceptions, setShowExceptions] = useState(true);
   const [briefing, setBriefing] = useState<string | null>(null);
+  const [stats, setStats] = useState<RunStats>(DEFAULT_STATS);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -83,53 +99,58 @@ export function useLiveOpsRun() {
     };
   }, []);
 
-  const applyLivePayload = useCallback((run: {
-    id: string;
-    status: string;
-    steps: Array<{
+  const applyLivePayload = useCallback(
+    (run: {
       id: string;
-      agent: string;
-      title: string;
-      detail: string | null;
       status: string;
-      startedAt?: string | null;
-    }>;
-    exceptions: LiveException[];
-    briefing: string | null;
-  }) => {
-    setLiveRunId(run.id);
-    const status = run.status.toUpperCase();
-    if (status === "RUNNING" || status === "QUEUED") {
-      setLiveBadge("running");
-      setLiveBusy(true);
-      setShowExceptions(run.exceptions.length > 0);
-    } else if (status === "SUCCEEDED") {
-      setLiveBadge("succeeded");
-      setLiveBusy(false);
-      setShowExceptions(true);
-      stopPoll();
-    } else if (status === "FAILED") {
-      setLiveBadge("idle");
-      setLiveBusy(false);
-      stopPoll();
-    }
+      steps: Array<{
+        id: string;
+        agent: string;
+        title: string;
+        detail: string | null;
+        status: string;
+        startedAt?: string | null;
+      }>;
+      exceptions: LiveException[];
+      briefing: string | null;
+      stats?: RunStats;
+    }) => {
+      setLiveRunId(run.id);
+      const status = run.status.toUpperCase();
+      if (status === "RUNNING" || status === "QUEUED") {
+        setLiveBadge("running");
+        setLiveBusy(true);
+        setShowExceptions(run.exceptions.length > 0);
+      } else if (status === "SUCCEEDED") {
+        setLiveBadge("succeeded");
+        setLiveBusy(false);
+        setShowExceptions(true);
+        stopPoll();
+      } else if (status === "FAILED") {
+        setLiveBadge("idle");
+        setLiveBusy(false);
+        stopPoll();
+      }
 
-    const steps: MockStep[] =
-      run.steps.length > 0
-        ? run.steps.map((step, index) => ({
-            id: step.id,
-            agent: mapAgentLabel(step.agent) as MockStep["agent"],
-            title: step.title,
-            detail: step.detail ?? "",
-            status: normalizeStatus(step.status),
-            at: `21:04:${String(index * 8).padStart(2, "0")}`,
-          }))
-        : MOCK_RUN.steps.map((s) => ({ ...s, status: "pending" as const }));
+      const steps: MockStep[] =
+        run.steps.length > 0
+          ? run.steps.map((step, index) => ({
+              id: step.id,
+              agent: mapAgentLabel(step.agent) as MockStep["agent"],
+              title: step.title,
+              detail: step.detail ?? "",
+              status: normalizeStatus(step.status),
+              at: `21:04:${String(index * 8).padStart(2, "0")}`,
+            }))
+          : MOCK_RUN.steps.map((s) => ({ ...s, status: "pending" as const }));
 
-    setLiveSteps(steps);
-    if (run.exceptions.length) setLiveExceptions(run.exceptions);
-    if (run.briefing) setBriefing(run.briefing);
-  }, [stopPoll]);
+      setLiveSteps(steps);
+      if (run.exceptions.length) setLiveExceptions(run.exceptions);
+      if (run.briefing) setBriefing(run.briefing);
+      if (run.stats) setStats(run.stats);
+    },
+    [stopPoll],
+  );
 
   const pollRun = useCallback(
     (runId: string) => {
@@ -176,11 +197,29 @@ export function useLiveOpsRun() {
     } catch (err) {
       setLiveBusy(false);
       setError(err instanceof Error ? err.message : "Live ops unavailable");
-      // Graceful fallback so the console still demos
       demo.start();
       setMode("demo");
     }
   }, [demo, mode, pollRun, programId]);
+
+  const statCards = [
+    {
+      label: "On track",
+      value: String(stats.onTrack),
+      hint: `of ${stats.students || 12} students`,
+    },
+    {
+      label: "Exceptions",
+      value: String(stats.exceptions),
+      hint: "need a decision",
+    },
+    {
+      label: "Draft nudges",
+      value: String(stats.draftNudges),
+      hint: "awaiting approval",
+    },
+    MOCK_STATS[3],
+  ];
 
   if (mode === "live") {
     return {
@@ -194,6 +233,7 @@ export function useLiveOpsRun() {
       exceptions: liveExceptions,
       briefing,
       error,
+      statCards,
       start,
     };
   }
@@ -209,6 +249,7 @@ export function useLiveOpsRun() {
     exceptions: MOCK_EXCEPTIONS,
     briefing: null,
     error,
+    statCards: MOCK_STATS,
     start,
   };
 }

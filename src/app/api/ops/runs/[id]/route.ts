@@ -24,11 +24,25 @@ export async function GET(_request: Request, { params }: Params) {
       return NextResponse.json({ ok: false, error: "Run not found" }, { status: 404 });
     }
 
-    const summary = (run.summary ?? {}) as { briefing?: string };
+    const summary = (run.summary ?? {}) as {
+      briefing?: string;
+      pendingApprovals?: number;
+    };
     const referee = run.steps.find((s) => s.agent === "REFEREE");
     const refereePayload = (referee?.payload ?? {}) as {
       exceptions?: { name: string; reason: string; severity: string }[];
+      complete?: number;
+      weak?: number;
+      missing?: number;
     };
+    const coach = run.steps.find((s) => s.agent === "COACH");
+    const coachPayload = (coach?.payload ?? {}) as { draftCount?: number };
+
+    const complete = refereePayload.complete ?? 0;
+    const weak = refereePayload.weak ?? 0;
+    const missing = refereePayload.missing ?? 0;
+    const exceptions = refereePayload.exceptions ?? [];
+    const draftCount = coachPayload.draftCount ?? run.approvals.length;
 
     return NextResponse.json({
       ok: true,
@@ -48,13 +62,19 @@ export async function GET(_request: Request, { params }: Params) {
           startedAt: step.startedAt,
           finishedAt: step.finishedAt,
         })),
-        exceptions: refereePayload.exceptions ?? [],
+        exceptions,
         approvals: run.approvals.map((a) => ({
           id: a.id,
           title: a.title,
           body: a.body,
           targetName: a.targetName,
         })),
+        stats: {
+          onTrack: complete,
+          students: complete + weak + missing,
+          exceptions: exceptions.length,
+          draftNudges: draftCount,
+        },
         briefing:
           summary.briefing ??
           ((run.steps.find((s) => s.agent === "CLERK")?.payload as { briefing?: string })

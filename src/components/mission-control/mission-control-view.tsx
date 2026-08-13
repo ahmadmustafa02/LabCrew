@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useLiveOpsRun } from "@/hooks/use-live-ops-run";
-import { DEMO_PROGRAM, MOCK_STATS, type StepStatus } from "@/lib/mock-data";
+import { DEMO_PROGRAM, type StepStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/cn";
 
 function statusStyles(status: StepStatus) {
@@ -37,6 +37,7 @@ export function MissionControlView() {
     exceptions,
     briefing,
     error,
+    statCards,
     start,
   } = useLiveOpsRun();
 
@@ -70,16 +71,14 @@ export function MissionControlView() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {MOCK_STATS.map((stat) => (
+        {statCards.map((stat) => (
           <div
             key={stat.label}
             className="rounded-[14px] border border-[var(--lc-line)] bg-lc-surface px-4 py-4"
           >
             <p className="text-xs text-lc-muted">{stat.label}</p>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-lc-ink">
-              {stat.label === "Exceptions"
-                ? String(exceptions.length || stat.value)
-                : stat.value}
+              {stat.value}
             </p>
             <p className="mt-1 text-xs text-lc-muted">{stat.hint}</p>
           </div>
