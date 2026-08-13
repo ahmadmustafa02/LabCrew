@@ -2,14 +2,8 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useOpsRunReplay } from "@/hooks/use-ops-run-replay";
-import {
-  DEMO_PROGRAM,
-  MOCK_EXCEPTIONS,
-  MOCK_RUN,
-  MOCK_STATS,
-  type StepStatus,
-} from "@/lib/mock-data";
+import { useLiveOpsRun } from "@/hooks/use-live-ops-run";
+import { DEMO_PROGRAM, MOCK_STATS, type StepStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/cn";
 
 function statusStyles(status: StepStatus) {
@@ -32,7 +26,19 @@ function badgeCopy(badge: "idle" | "running" | "succeeded") {
 }
 
 export function MissionControlView() {
-  const { steps, badge, busy, runId, showExceptions, start } = useOpsRunReplay();
+  const {
+    mode,
+    programLabel,
+    steps,
+    badge,
+    busy,
+    runId,
+    showExceptions,
+    exceptions,
+    briefing,
+    error,
+    start,
+  } = useLiveOpsRun();
 
   return (
     <div className="space-y-8">
@@ -43,9 +49,14 @@ export function MissionControlView() {
             Weekly ops
           </h1>
           <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-lc-muted">
-            {DEMO_PROGRAM.activeMilestone}. Agents prepare the exception set;
-            you decide what ships.
+            {DEMO_PROGRAM.activeMilestone}.{" "}
+            {mode === "live"
+              ? `${programLabel} is connected — runs hit BullMQ + Postgres.`
+              : "Demo replay mode (start Docker + seed for live crew)."}
           </p>
+          {error ? (
+            <p className="mt-2 text-sm text-lc-danger">{error}</p>
+          ) : null}
         </div>
         <Button
           variant="accent"
@@ -66,7 +77,9 @@ export function MissionControlView() {
           >
             <p className="text-xs text-lc-muted">{stat.label}</p>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-lc-ink">
-              {stat.value}
+              {stat.label === "Exceptions"
+                ? String(exceptions.length || stat.value)
+                : stat.value}
             </p>
             <p className="mt-1 text-xs text-lc-muted">{stat.hint}</p>
           </div>
@@ -81,8 +94,8 @@ export function MissionControlView() {
                 Agent timeline
               </h2>
               <p className="mt-0.5 font-mono text-xs text-lc-muted">
-                {runId} · {MOCK_RUN.startedAt}
-                {badge === "succeeded" ? ` · ${MOCK_RUN.duration}` : ""}
+                {runId}
+                {mode === "live" ? " · live" : " · demo"}
               </p>
             </div>
             <span
@@ -151,17 +164,17 @@ export function MissionControlView() {
             </div>
             {showExceptions ? (
               <ul className="divide-y divide-[var(--lc-line)]">
-                {MOCK_EXCEPTIONS.map((item) => (
-                  <li key={item.id} className="px-5 py-4 lc-animate-in">
+                {exceptions.map((item) => (
+                  <li
+                    key={`${item.name}-${item.reason}`}
+                    className="px-5 py-4 lc-animate-in"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-lc-ink">
                           {item.name}
                         </p>
                         <p className="mt-1 text-sm text-lc-muted">{item.reason}</p>
-                        <p className="mt-1 text-xs text-lc-muted">
-                          {item.milestone}
-                        </p>
                       </div>
                       <span
                         className={cn(
@@ -190,7 +203,8 @@ export function MissionControlView() {
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-lc-muted">
               {showExceptions
-                ? "Cohort is mostly healthy. Three students need attention before Wednesday standup. Three Coach drafts are waiting on Approvals."
+                ? briefing ??
+                  "Cohort is mostly healthy. Three students need attention. Coach drafts are waiting on Approvals."
                 : "Clerk will assemble the Monday packet when the crew finishes."}
             </p>
             <div className="mt-4">

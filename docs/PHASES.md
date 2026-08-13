@@ -24,11 +24,11 @@
 
 ## Phase 2 — Agent runtime
 
-- Redis + BullMQ worker process *(queue + worker stub landed)*
-- Dispatcher → Pulse → Referee → Coach → Clerk
-- Persist `AgentRun` / `AgentStep`
-- SSE stream into Mission Control
-- Enqueue from Mission Control “Run weekly ops”
+- Redis + BullMQ worker process
+- Dispatcher -> Pulse -> Referee -> Coach -> Clerk *(persists AgentRun/AgentStep)*
+- Enqueue from Mission Control "Run weekly ops" + poll run status
+- Approvals API reads Coach drafts
+- SSE stream into Mission Control *(optional next polish)*
 
 ## Phase 3 — Director + analytics
 
