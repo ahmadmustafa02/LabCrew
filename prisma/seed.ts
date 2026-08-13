@@ -47,7 +47,7 @@ async function main() {
   const program = await prisma.program.create({
     data: {
       organizationId: org.id,
-      name: "Summer Research Cohort ’26",
+      name: "Summer Research Cohort '26",
       termLabel: "Summer 2026",
     },
   });
@@ -71,7 +71,7 @@ async function main() {
   const milestone = await prisma.milestone.create({
     data: {
       programId: program.id,
-      title: "Week 4 — Working demo + short report",
+      title: "Week 4 - Working demo + short report",
       description: "Ship a working demo link and a short methods/results writeup.",
       status: MilestoneStatus.ACTIVE,
       sortOrder: 4,
@@ -97,21 +97,33 @@ async function main() {
       },
     });
 
-    const isException = index < 3;
+    // Demo exceptions: missing / weak writeup / missing evidence
+    let status: SubmissionStatus = SubmissionStatus.SUBMITTED;
+    let evidenceUrl: string | null = `https://demo.northwater.lab/${slug}`;
+    let writeup: string | null =
+      "Methods, results, and next steps documented for Week 4.";
+    let submittedAt: Date | null = new Date();
+
+    if (index === 0) {
+      status = SubmissionStatus.DRAFT;
+      evidenceUrl = null;
+      writeup = null;
+      submittedAt = null;
+    } else if (index === 1) {
+      writeup = "Demo works. Still polishing notes.";
+    } else if (index === 2) {
+      evidenceUrl = null;
+      writeup = "Wrote up methods but forgot to attach the demo URL.";
+    }
+
     await prisma.submission.create({
       data: {
         milestoneId: milestone.id,
         memberId: member.id,
-        status: isException ? SubmissionStatus.DRAFT : SubmissionStatus.SUBMITTED,
-        evidenceUrl: isException
-          ? null
-          : `https://demo.northwater.lab/${slug}`,
-        writeup: isException
-          ? index === 1
-            ? "Demo works. Still polishing notes."
-            : null
-          : "Methods, results, and next steps documented for Week 4.",
-        submittedAt: isException ? null : new Date(),
+        status,
+        evidenceUrl,
+        writeup,
+        submittedAt,
       },
     });
   }

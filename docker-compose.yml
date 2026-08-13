@@ -4,7 +4,8 @@ services:
     container_name: labcrew-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      # Host 5434 avoids clashes with other local Postgres containers
+      - "5434:5432"
     environment:
       POSTGRES_USER: labcrew
       POSTGRES_PASSWORD: labcrew
@@ -22,7 +23,8 @@ services:
     container_name: labcrew-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Host 6380 avoids clashes with other local Redis containers
+      - "6380:6379"
     volumes:
       - labcrew_redis_data:/data
     healthcheck:

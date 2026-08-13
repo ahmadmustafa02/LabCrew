@@ -20,7 +20,7 @@ function createPrismaClient() {
     });
 
   const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({
+  const client = new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
@@ -29,11 +29,22 @@ function createPrismaClient() {
     globalForPrisma.pgPool = pool;
   }
 
-  return prisma;
+  return client;
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+/** Lazy accessor — safe for scripts/workers; avoids import-time crashes in edge cases. */
+export function getPrisma() {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+  }
+  return globalForPrisma.prisma;
 }
+
+/** @deprecated prefer getPrisma() */
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getPrisma();
+    const value = Reflect.get(client, prop, receiver);
+    return typeof value === "function" ? value.bind(client) : value;
+  },
+});

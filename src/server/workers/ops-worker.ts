@@ -1,30 +1,20 @@
 import "dotenv/config";
 import { Worker } from "bullmq";
+import { executeWeeklyOps } from "../agents/weekly-ops";
 import { getRedisConnection } from "../queue/connection";
 import { OPS_QUEUE_NAME, type WeeklyOpsJob } from "../queue/ops-queue";
 
-/**
- * Phase 2 foundation: worker process that will run the agent crew.
- * Next slice: persist AgentRun/AgentStep and stream into Mission Control.
- */
-async function processWeeklyOps(job: { id?: string; data: WeeklyOpsJob }) {
-  const { programId, trigger = "manual" } = job.data;
-  console.log(`[ops-worker] start job=${job.id} program=${programId} trigger=${trigger}`);
-
-  // Placeholder pipeline — real Pulse→Referee→Coach→Clerk lands next.
-  const agents = ["Dispatcher", "Pulse", "Referee", "Coach", "Clerk"] as const;
-  for (const agent of agents) {
-    console.log(`[ops-worker] ${agent}…`);
-    await new Promise((r) => setTimeout(r, 250));
-  }
-
-  console.log(`[ops-worker] complete job=${job.id}`);
-  return { ok: true, programId };
-}
-
 const worker = new Worker<WeeklyOpsJob>(
   OPS_QUEUE_NAME,
-  async (job) => processWeeklyOps(job),
+  async (job) => {
+    const { programId, runId, trigger = "manual" } = job.data;
+    console.log(
+      `[ops-worker] start job=${job.id} run=${runId} program=${programId} trigger=${trigger}`,
+    );
+    const result = await executeWeeklyOps(runId);
+    console.log(`[ops-worker] complete run=${runId}`);
+    return result;
+  },
   {
     connection: getRedisConnection(),
     concurrency: 2,

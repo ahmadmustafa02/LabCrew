@@ -5,6 +5,7 @@ export const OPS_QUEUE_NAME = "labcrew-ops";
 
 export type WeeklyOpsJob = {
   programId: string;
+  runId: string;
   trigger?: "manual" | "schedule";
 };
 
