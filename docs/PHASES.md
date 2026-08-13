@@ -32,9 +32,9 @@
 
 ## Phase 3 — Director + analytics
 
-- Approval board (edit / approve / reject)
-- Nudge delivery (Resend or demo provider)
-- Cohort charts (completion, at-risk, nudge→submit)
+- Approval board (edit / approve / reject) *(landed — send is simulated)*
+- Nudge delivery provider (Resend) *(optional later)*
+- Cohort analytics from DB + recent ops runs *(landed)*
 
 ## Phase 4 — Ship
 
