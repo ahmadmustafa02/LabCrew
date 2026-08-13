@@ -1,0 +1,194 @@
+// LabCrew — Phase 1 schema contract
+// DB not required to run the Phase 1 UI (mock data).
+// Wire DATABASE_URL + migrate in Phase 1b / Phase 2.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MemberRole {
+  ADMIN
+  MENTOR
+  STUDENT
+}
+
+enum MilestoneStatus {
+  UPCOMING
+  ACTIVE
+  CLOSED
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  SCORED
+}
+
+enum AgentName {
+  DISPATCHER
+  PULSE
+  REFEREE
+  COACH
+  CLERK
+}
+
+enum AgentRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AgentStepStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EDITED
+}
+
+model Organization {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  programs  Program[]
+  members   Member[]
+}
+
+model Program {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  termLabel      String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  members        Member[]
+  milestones     Milestone[]
+  agentRuns      AgentRun[]
+  approvals      ApprovalItem[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  members   Member[]
+}
+
+model Member {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           MemberRole
+  createdAt      DateTime     @default(now())
+  submissions    Submission[]
+
+  @@unique([programId, userId])
+  @@index([organizationId])
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  programId   String
+  program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueAt       DateTime?
+  status      MilestoneStatus @default(UPCOMING)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  submissions Submission[]
+}
+
+model Submission {
+  id          String           @id @default(cuid())
+  milestoneId String
+  milestone   Milestone        @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  memberId    String
+  member      Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  status      SubmissionStatus @default(DRAFT)
+  evidenceUrl String?
+  writeup     String?
+  checklist   Json?
+  score       Json?
+  submittedAt DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([milestoneId, memberId])
+  @@index([memberId])
+}
+
+model AgentRun {
+  id          String         @id @default(cuid())
+  programId   String
+  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  status      AgentRunStatus @default(QUEUED)
+  trigger     String         @default("manual")
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  summary     Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  steps       AgentStep[]
+  approvals   ApprovalItem[]
+
+  @@index([programId, createdAt])
+}
+
+model AgentStep {
+  id          String          @id @default(cuid())
+  runId       String
+  run         AgentRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  agent       AgentName
+  title       String
+  status      AgentStepStatus @default(PENDING)
+  detail      String?
+  payload     Json?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+
+  @@index([runId, sortOrder])
+}
+
+model ApprovalItem {
+  id          String         @id @default(cuid())
+  programId   String
+  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  runId       String?
+  run         AgentRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  kind        String
+  title       String
+  body        String
+  targetName  String?
+  status      ApprovalStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  decidedAt   DateTime?
+
+  @@index([programId, status])
+}

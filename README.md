@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LabCrew
 
-## Getting Started
+AI operations crew for research labs and project cohorts.  
+Humans direct. Agents run the weekly ops loop.
 
-First, run the development server:
+**Pillar 2** of the portfolio (with [CodePulse](https://getcodepulse.vercel.app) as AI-for-SE).
+
+## Stack
+
+- Next.js (App Router) + TypeScript + Tailwind CSS v4
+- PostgreSQL + Prisma (schema in Phase 1; wired in later phase)
+- BullMQ + Redis (Phase 2 — agent workers)
+- Auth.js (Phase 1b/2)
+
+## Phases
+
+See [docs/PHASES.md](./docs/PHASES.md) and [docs/DESIGN.md](./docs/DESIGN.md).
+
+| Phase | Status | Focus |
+| ----- | ------ | ----- |
+| 0 | Done | Design system, product rules |
+| 1 | In progress | Platform shell + Mission Control mock (no real agents yet) |
+| 2 | Not started | BullMQ workers + real agent crew |
+| 3 | Not started | Approval board + analytics |
+| 4 | Not started | Docker + production deploy |
+
+## Develop
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Product rules
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Hero product moment: **Run weekly ops** → live Mission Control → approval board
+- Never market as “project management”
+- No GitHub PR review features (CodePulse owns that lane)
+- LLMs only in Referee (writeups) and Coach (nudges); orchestration stays deterministic

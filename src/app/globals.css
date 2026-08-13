@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --lc-bg: #fbfbfd;
+  --lc-surface: #ffffff;
+  --lc-ink: #1d1d1f;
+  --lc-muted: #6e6e73;
+  --lc-line: rgba(0, 0, 0, 0.08);
+  --lc-line-strong: rgba(0, 0, 0, 0.12);
+  --lc-accent: #0071e3;
+  --lc-accent-soft: rgba(0, 113, 227, 0.08);
+  --lc-ink-inverse: #ffffff;
+  --lc-success: #1f8a4c;
+  --lc-success-soft: rgba(31, 138, 76, 0.1);
+  --lc-warn: #b86e00;
+  --lc-warn-soft: rgba(184, 110, 0, 0.1);
+  --lc-danger: #d70015;
+  --lc-danger-soft: rgba(215, 0, 21, 0.08);
+  --lc-halo: radial-gradient(
+    120% 80% at 50% -10%,
+    rgba(0, 113, 227, 0.07),
+    transparent 55%
+  );
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-lc-bg: var(--lc-bg);
+  --color-lc-surface: var(--lc-surface);
+  --color-lc-ink: var(--lc-ink);
+  --color-lc-muted: var(--lc-muted);
+  --color-lc-line: var(--lc-line);
+  --color-lc-accent: var(--lc-accent);
+  --color-lc-success: var(--lc-success);
+  --color-lc-warn: var(--lc-warn);
+  --color-lc-danger: var(--lc-danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  margin: 0;
+  background: var(--lc-bg);
+  color: var(--lc-ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--lc-accent-soft);
+  color: var(--lc-ink);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+@keyframes lc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lc-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.lc-animate-in {
+  animation: lc-fade-up 0.45s ease both;
+}
+
+.lc-delay-1 {
+  animation-delay: 0.06s;
+}
+.lc-delay-2 {
+  animation-delay: 0.12s;
+}
+.lc-delay-3 {
+  animation-delay: 0.18s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-animate-in {
+    animation: none;
+  }
 }
