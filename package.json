@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "worker": "tsx src/server/workers/ops-worker.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -19,8 +20,10 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "bullmq": "^6.1.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
+    "ioredis": "^6.0.0",
     "next": "16.3.0",
     "pg": "^8.23.0",
     "react": "19.2.8",

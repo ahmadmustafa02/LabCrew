@@ -24,10 +24,11 @@
 
 ## Phase 2 — Agent runtime
 
-- Redis + BullMQ worker process
+- Redis + BullMQ worker process *(queue + worker stub landed)*
 - Dispatcher → Pulse → Referee → Coach → Clerk
 - Persist `AgentRun` / `AgentStep`
 - SSE stream into Mission Control
+- Enqueue from Mission Control “Run weekly ops”
 
 ## Phase 3 — Director + analytics
 
