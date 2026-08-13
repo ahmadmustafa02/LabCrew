@@ -35,7 +35,17 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Phase 1 UI runs with mock data even if Docker is down. Database seed and BullMQ workers come next.
+Phase 1 UI runs with mock data even if Docker is down.
+
+Once Docker is running:
+
+```bash
+npm run db:generate
+npm run db:push
+npm run db:seed
+```
+
+See [docs/DATA.md](./docs/DATA.md). BullMQ workers come in Phase 2.
 
 ## Product rules
 
