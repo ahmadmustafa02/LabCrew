@@ -4,20 +4,22 @@ import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { AuthChrome } from "@/components/auth/auth-chrome";
+import { GoogleSignInButton } from "@/components/auth/google-button";
 import { AuthProvider } from "@/components/session/auth-provider";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
 const DEMOS = [
   {
     label: "Director Reed",
     email: "director@northwater.lab",
-    hint: "Mission Control, Brief, Approvals",
+    hint: "Seeded demo lab",
   },
   {
     label: "Ayesha (student)",
     email: "ayesha.rahman@students.northwater.lab",
-    hint: "Submit evidence on My tasks",
+    hint: "Seeded demo student",
   },
 ];
 
@@ -25,15 +27,17 @@ function LoginFormInner() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get("next") || "/app";
-  const [email, setEmail] = useState(DEMOS[0].email);
-  const [password, setPassword] = useState("labcrew");
+  const switched = search.get("switch") === "1";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showDemo, setShowDemo] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const subtitle = useMemo(
-    () => "Demo password for every seeded account: labcrew",
-    [],
-  );
+  const subtitle = useMemo(() => {
+    if (switched) return "Choose another account to continue.";
+    return "Sign in to your lab workspace.";
+  }, [switched]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -46,7 +50,7 @@ function LoginFormInner() {
     });
     setBusy(false);
     if (res?.error) {
-      setError("Invalid email or password. Try a demo account above.");
+      setError("Invalid email or password.");
       return;
     }
     router.replace(next);
@@ -54,104 +58,103 @@ function LoginFormInner() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-lc-bg">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "var(--lc-halo)" }}
-      />
-      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-6 py-16">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/"
-            className="text-[17px] font-semibold tracking-tight text-lc-ink"
-          >
-            LabCrew
-          </Link>
-          <Link
-            href="/"
-            className="text-sm text-lc-muted transition-colors hover:text-lc-ink"
-          >
-            ← Back to home
-          </Link>
+    <AuthChrome backHref="/" backLabel="Home">
+      <h1 className="text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
+        {switched ? "Switch account" : "Sign in"}
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-lc-muted">{subtitle}</p>
+
+      <div className="mt-8 space-y-3">
+        <GoogleSignInButton callbackUrl="/app" />
+        <div className="flex items-center gap-3 py-1">
+          <div className="h-px flex-1 bg-[var(--lc-line)]" />
+          <span className="text-xs text-lc-muted">or email</span>
+          <div className="h-px flex-1 bg-[var(--lc-line)]" />
         </div>
-        <h1 className="mt-8 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
-          Sign in
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-lc-muted">{subtitle}</p>
-
-        <div className="mt-6 space-y-2">
-          {DEMOS.map((demo) => {
-            const selected = email === demo.email;
-            return (
-              <button
-                key={demo.email}
-                type="button"
-                onClick={() => {
-                  setEmail(demo.email);
-                  setPassword("labcrew");
-                  setError(null);
-                }}
-                className={cn(
-                  "flex w-full cursor-pointer flex-col rounded-[12px] border px-4 py-3 text-left transition-colors",
-                  selected
-                    ? "border-lc-accent bg-[var(--lc-accent-soft)]"
-                    : "border-[var(--lc-line)] bg-lc-surface hover:bg-[#fafafa]",
-                )}
-              >
-                <span className="text-sm font-medium text-lc-ink">
-                  {demo.label}
-                </span>
-                <span className="mt-0.5 text-xs text-lc-muted">{demo.hint}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <form onSubmit={onSubmit} className="mt-6 space-y-3">
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-lc-muted">Email</span>
-            <input
-              className="lc-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="username"
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-lc-muted">Password</span>
-            <input
-              className="lc-input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-          {error ? <p className="text-sm text-lc-danger">{error}</p> : null}
-          <Button
-            type="submit"
-            variant="accent"
-            size="lg"
-            disabled={busy}
-            className="w-full"
-          >
-            {busy ? "Signing in…" : "Continue"}
-          </Button>
-        </form>
-
-        <p className="mt-8 text-center text-sm text-lc-muted">
-          New lab?{" "}
-          <Link href="/signup" className="text-lc-ink hover:underline">
-            Create an account
-          </Link>
-          <span className="mx-2 text-[var(--lc-line-strong)]">·</span>
-          <Link href="/" className="transition-colors hover:text-lc-ink">
-            ← Home
-          </Link>
-        </p>
       </div>
-    </div>
+
+      <form onSubmit={onSubmit} className="mt-2 space-y-3">
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-lc-muted">Email</span>
+          <input
+            className="lc-input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            required
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-lc-muted">Password</span>
+          <input
+            className="lc-input"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+        </label>
+        {error ? <p className="text-sm text-lc-danger">{error}</p> : null}
+        <Button
+          type="submit"
+          variant="accent"
+          size="lg"
+          disabled={busy}
+          className="w-full"
+        >
+          {busy ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-lc-muted">
+        New lab?{" "}
+        <Link href="/signup" className="font-medium text-lc-ink hover:underline">
+          Create an account
+        </Link>
+      </p>
+
+      <div className="mt-8 border-t border-[var(--lc-line)] pt-6">
+        <button
+          type="button"
+          className="cursor-pointer text-xs font-medium text-lc-muted transition-colors hover:text-lc-ink"
+          onClick={() => setShowDemo((v) => !v)}
+        >
+          {showDemo ? "Hide demo accounts" : "Use seeded demo accounts"}
+        </button>
+        {showDemo ? (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-lc-muted">Password for demos: labcrew</p>
+            {DEMOS.map((demo) => {
+              const selected = email === demo.email;
+              return (
+                <button
+                  key={demo.email}
+                  type="button"
+                  onClick={() => {
+                    setEmail(demo.email);
+                    setPassword("labcrew");
+                    setError(null);
+                  }}
+                  className={cn(
+                    "flex w-full cursor-pointer flex-col rounded-[12px] border px-4 py-3 text-left transition-colors",
+                    selected
+                      ? "border-lc-accent bg-[var(--lc-accent-soft)]"
+                      : "border-[var(--lc-line)] bg-lc-surface hover:bg-[#fafafa]",
+                  )}
+                >
+                  <span className="text-sm font-medium text-lc-ink">
+                    {demo.label}
+                  </span>
+                  <span className="mt-0.5 text-xs text-lc-muted">{demo.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
+    </AuthChrome>
   );
 }
 

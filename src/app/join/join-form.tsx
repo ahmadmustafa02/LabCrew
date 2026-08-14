@@ -4,8 +4,9 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
+import { AuthChrome } from "@/components/auth/auth-chrome";
 import { AuthProvider } from "@/components/session/auth-provider";
+import { Button } from "@/components/ui/button";
 
 function JoinFormInner() {
   const router = useRouter();
@@ -31,7 +32,9 @@ function JoinFormInner() {
         return;
       }
       try {
-        const res = await fetch(`/api/invites/accept?token=${encodeURIComponent(token)}`);
+        const res = await fetch(
+          `/api/invites/accept?token=${encodeURIComponent(token)}`,
+        );
         const data = await res.json();
         if (!cancelled) {
           if (!data.ok) setError(data.error ?? "Invalid invite");
@@ -80,74 +83,64 @@ function JoinFormInner() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-lc-bg">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: "var(--lc-halo)" }}
-      />
-      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-6 py-16">
-        <Link
-          href="/"
-          className="text-[17px] font-semibold tracking-tight text-lc-ink"
-        >
-          LabCrew
-        </Link>
-        <h1 className="mt-8 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
-          Join program
-        </h1>
-        {loading ? (
-          <p className="mt-2 text-sm text-lc-muted">Loading invite…</p>
-        ) : inviteMeta ? (
-          <>
-            <p className="mt-2 text-sm leading-relaxed text-lc-muted">
-              You’re invited to{" "}
-              <span className="text-lc-ink">{inviteMeta.programName}</span> at{" "}
-              <span className="text-lc-ink">{inviteMeta.orgName}</span> as{" "}
-              <span className="text-lc-ink">{inviteMeta.email}</span>.
-            </p>
-            <form onSubmit={onSubmit} className="mt-6 space-y-3">
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-lc-muted">Your name</span>
-                <input
-                  className="lc-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-lc-muted">
-                  Choose a password (min 8)
-                </span>
-                <input
-                  className="lc-input"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  minLength={8}
-                  required
-                />
-              </label>
-              {error ? <p className="text-sm text-lc-danger">{error}</p> : null}
-              <Button
-                type="submit"
-                variant="accent"
-                size="lg"
-                disabled={busy}
-                className="w-full"
-              >
-                {busy ? "Joining…" : "Accept invite"}
-              </Button>
-            </form>
-          </>
-        ) : (
-          <p className="mt-2 text-sm text-lc-danger">
-            {error ?? "Invite unavailable"}
+    <AuthChrome backHref="/login" backLabel="Sign in">
+      <h1 className="text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
+        Join program
+      </h1>
+      {loading ? (
+        <p className="mt-2 text-sm text-lc-muted">Loading invite…</p>
+      ) : inviteMeta ? (
+        <>
+          <p className="mt-2 text-sm leading-relaxed text-lc-muted">
+            You’re invited to{" "}
+            <span className="text-lc-ink">{inviteMeta.programName}</span> at{" "}
+            <span className="text-lc-ink">{inviteMeta.orgName}</span> as{" "}
+            <span className="text-lc-ink">{inviteMeta.email}</span>.
           </p>
-        )}
-      </div>
-    </div>
+          <form onSubmit={onSubmit} className="mt-8 space-y-3">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-lc-muted">Your name</span>
+              <input
+                className="lc-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-lc-muted">
+                Choose a password (min 8)
+              </span>
+              <input
+                className="lc-input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                required
+              />
+            </label>
+            {error ? <p className="text-sm text-lc-danger">{error}</p> : null}
+            <Button
+              type="submit"
+              variant="accent"
+              size="lg"
+              disabled={busy}
+              className="w-full"
+            >
+              {busy ? "Joining…" : "Accept invite"}
+            </Button>
+          </form>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-lc-danger">
+          {error ?? "Invite unavailable"}{" "}
+          <Link href="/login" className="underline">
+            Sign in
+          </Link>
+        </p>
+      )}
+    </AuthChrome>
   );
 }
 

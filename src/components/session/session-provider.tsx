@@ -18,7 +18,9 @@ type SessionState = {
   programName: string | null;
   userName: string | null;
   userEmail: string | null;
+  needsOnboarding: boolean;
   ready: boolean;
+  switchAccount: () => Promise<void>;
   signOutUser: () => Promise<void>;
 };
 
@@ -32,12 +34,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (status !== "loading") setReady(true);
   }, [status]);
 
+  const switchAccount = useCallback(async () => {
+    await signOut({ callbackUrl: "/login?switch=1" });
+  }, []);
+
   const signOutUser = useCallback(async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ callbackUrl: "/" });
   }, []);
 
   const value = useMemo<SessionState>(() => {
     const role = (data?.user?.role as AppRole) ?? "director";
+    const needsOnboarding = Boolean(
+      (data?.user as { needsOnboarding?: boolean } | undefined)
+        ?.needsOnboarding,
+    );
     return {
       role,
       studentMemberId:
@@ -46,10 +56,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       programName: data?.user?.programName ?? null,
       userName: data?.user?.name ?? null,
       userEmail: data?.user?.email ?? null,
+      needsOnboarding,
       ready,
+      switchAccount,
       signOutUser,
     };
-  }, [data, ready, signOutUser]);
+  }, [data, ready, switchAccount, signOutUser]);
 
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

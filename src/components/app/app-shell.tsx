@@ -2,19 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AccountMenu } from "@/components/auth/account-menu";
 import { PageTransition } from "@/components/app/page-transition";
 import { useSession } from "@/components/session/session-provider";
 import { cn } from "@/lib/cn";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const {
-    role,
-    programName,
-    studentName,
-    userName,
-    signOutUser,
-  } = useSession();
+  const { role, programName } = useSession();
 
   const nav =
     role === "director"
@@ -39,25 +34,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="hidden h-4 w-px bg-[var(--lc-line-strong)] sm:block" />
             <div className="hidden min-w-0 sm:block">
               <p className="truncate text-sm font-medium text-lc-ink">
-                {programName ?? "Northwater Lab"}
+                {programName ?? "Your lab"}
               </p>
               <p className="text-xs text-lc-muted">
-                {role === "director"
-                  ? `Director · ${userName ?? "…"}`
-                  : `Student · ${studentName ?? userName ?? "…"}`}
+                {role === "director" ? "Director workspace" : "Student workspace"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => void signOutUser()}
-              className="cursor-pointer rounded-[10px] px-3 py-1.5 text-xs font-medium text-lc-muted transition-colors hover:bg-black/[0.04] hover:text-lc-ink"
-            >
-              Switch account
-            </button>
-          </div>
+          <AccountMenu />
         </div>
       </header>
 
@@ -68,7 +53,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               const active =
                 item.href === "/app/assignments"
                   ? pathname.startsWith("/app/assignments")
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  : pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
@@ -93,7 +79,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               const active =
                 item.href === "/app/assignments"
                   ? pathname.startsWith("/app/assignments")
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  : pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}

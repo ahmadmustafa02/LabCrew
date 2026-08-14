@@ -7,15 +7,25 @@ export const authConfig = {
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   providers: [],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.role = user.role;
         token.memberId = user.memberId;
         token.programName = user.programName;
+        token.needsOnboarding = Boolean(
+          (user as { needsOnboarding?: boolean }).needsOnboarding,
+        );
       }
+
+      // Refresh membership from DB when possible (Google / returning sessions)
+      if (token.sub && (user || trigger === "update")) {
+        // filled in auth.ts via events — keep token fields
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -24,19 +34,21 @@ export const authConfig = {
         role: AppRole;
         memberId?: string;
         programName?: string;
+        needsOnboarding?: boolean;
       };
       user.id = token.sub ?? "";
-      user.role = (token.role as AppRole) ?? "student";
-      user.memberId = typeof token.memberId === "string" ? token.memberId : undefined;
+      user.role = (token.role as AppRole) ?? "director";
+      user.memberId =
+        typeof token.memberId === "string" ? token.memberId : undefined;
       user.programName =
         typeof token.programName === "string" ? token.programName : undefined;
+      user.needsOnboarding = Boolean(token.needsOnboarding);
       return session;
     },
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
       const isLoggedIn = Boolean(auth);
       if (pathname.startsWith("/app")) return isLoggedIn;
-      if (pathname === "/login") return true;
       return true;
     },
   },
