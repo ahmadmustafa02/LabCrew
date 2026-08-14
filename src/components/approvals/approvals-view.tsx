@@ -143,7 +143,16 @@ export function ApprovalsView() {
         ) : null}
       </div>
 
-      {approvals.length === 0 ? (
+      {source === "loading" ? (
+        <div className="space-y-3" aria-busy="true">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-[120px] animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface"
+            />
+          ))}
+        </div>
+      ) : approvals.length === 0 ? (
         <div className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-10 text-sm text-lc-muted">
           No pending drafts. Run weekly ops from Mission Control when the cohort
           needs attention.
@@ -156,7 +165,7 @@ export function ApprovalsView() {
             return (
               <article
                 key={draft.id}
-                className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5"
+                className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5 transition-[opacity,transform] duration-200"
               >
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -169,7 +178,7 @@ export function ApprovalsView() {
                           value={draftBody}
                           onChange={(e) => setDraftBody(e.target.value)}
                           rows={4}
-                          className="mt-3 w-full resize-y rounded-[12px] border border-[var(--lc-line-strong)] bg-lc-bg px-3 py-2.5 text-sm leading-relaxed text-lc-ink outline-none transition-colors focus:border-lc-accent"
+                          className="lc-input mt-3 min-h-[96px] py-2.5"
                         />
                       ) : (
                         <p className="mt-2 text-sm leading-relaxed text-lc-muted">

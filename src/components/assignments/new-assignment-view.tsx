@@ -6,8 +6,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { MaterialItem } from "@/lib/assignment-types";
 
-const inputClass =
-  "w-full rounded-[12px] border border-[var(--lc-line-strong)] bg-lc-bg px-3.5 py-2.5 text-sm text-lc-ink outline-none focus:border-lc-accent";
+const inputClass = "lc-input";
 
 export function NewAssignmentView() {
   const router = useRouter();
@@ -155,52 +154,76 @@ export function NewAssignmentView() {
       </div>
 
       <div className="space-y-4 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5">
-        <h2 className="text-[15px] font-semibold text-lc-ink">Materials</h2>
-        <p className="text-sm text-lc-muted">
-          PDFs, paper links, starter repos — what students should read or use.
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div>
+          <h2 className="text-[15px] font-semibold text-lc-ink">Materials</h2>
+          <p className="mt-1 text-sm text-lc-muted">
+            PDFs, paper links, starter repos — what students should read or use.
+          </p>
+        </div>
+
+        <div className="space-y-2">
           <input
             value={linkTitle}
             onChange={(e) => setLinkTitle(e.target.value)}
-            placeholder="Label"
-            className={`${inputClass} sm:w-40`}
-          />
-          <input
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            placeholder="https://..."
+            placeholder="Label (optional)"
             className={inputClass}
           />
-          <Button type="button" variant="secondary" size="sm" onClick={addLink}>
-            Add link
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://..."
+              className={inputClass}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addLink();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              onClick={addLink}
+              disabled={!linkUrl.trim()}
+              className="px-3"
+            >
+              Add
+            </Button>
+          </div>
         </div>
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-lc-muted">
-          <span className="rounded-[10px] border border-[var(--lc-line-strong)] bg-lc-bg px-3 py-2 text-lc-ink">
-            {uploadBusy ? "Uploading…" : "Upload PDF / file"}
-          </span>
-          <input
-            type="file"
-            className="hidden"
-            accept=".pdf,.png,.jpg,.jpeg,.txt,.md"
-            disabled={uploadBusy}
-            onChange={(e) => void onUpload(e.target.files?.[0] ?? null)}
-          />
-        </label>
+
+        <div className="flex items-center gap-3">
+          <label className="inline-flex cursor-pointer items-center">
+            <span className="rounded-[10px] border border-[var(--lc-line-strong)] bg-lc-bg px-3 py-2 text-[13px] font-medium text-lc-ink transition-colors hover:bg-[#f0f0f2]">
+              {uploadBusy ? "Uploading…" : "Upload file"}
+            </span>
+            <input
+              type="file"
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.txt,.md"
+              disabled={uploadBusy}
+              onChange={(e) => void onUpload(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <span className="text-xs text-lc-muted">PDF, images, or notes</span>
+        </div>
+
         {materials.length > 0 ? (
-          <ul className="space-y-2">
+          <ul className="space-y-2 border-t border-[var(--lc-line)] pt-3">
             {materials.map((m) => (
               <li
                 key={m.id}
-                className="flex items-center justify-between rounded-[10px] bg-lc-bg px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-3 rounded-[10px] bg-lc-bg px-3 py-2.5 text-sm"
               >
-                <span className="text-lc-ink">
-                  {m.title} <span className="text-lc-muted">({m.kind})</span>
+                <span className="min-w-0 truncate text-lc-ink">
+                  {m.title}
+                  <span className="ml-2 text-xs text-lc-muted">{m.kind}</span>
                 </span>
                 <button
                   type="button"
-                  className="cursor-pointer text-xs text-lc-danger"
+                  className="cursor-pointer text-xs font-medium text-lc-muted transition-colors hover:text-lc-danger"
                   onClick={() =>
                     setMaterials((prev) => prev.filter((x) => x.id !== m.id))
                   }

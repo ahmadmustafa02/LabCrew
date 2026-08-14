@@ -15,7 +15,7 @@ const variants: Record<Variant, string> = {
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
 };
 
 export function Button({
@@ -27,10 +27,11 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex cursor-pointer items-center justify-center gap-2 rounded-[10px] font-medium transition-[background-color,transform,opacity] duration-200 disabled:cursor-not-allowed disabled:opacity-45",
-        size === "sm" && "h-9 px-3.5 text-sm",
-        size === "md" && "h-11 px-5 text-[15px]",
-        size === "lg" && "h-12 px-6 text-[15px]",
+        "inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] font-medium transition-[background-color,transform,opacity,border-color] duration-200 ease-out disabled:cursor-not-allowed disabled:opacity-45",
+        size === "xs" && "h-10 min-w-10 px-3 text-[13px]",
+        size === "sm" && "h-9 px-3.5 text-[13px]",
+        size === "md" && "h-10 px-4 text-[14px]",
+        size === "lg" && "h-11 px-5 text-[15px]",
         variants[variant],
         className,
       )}

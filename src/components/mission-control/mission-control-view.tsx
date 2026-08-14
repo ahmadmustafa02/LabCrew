@@ -74,7 +74,7 @@ export function MissionControlView() {
         {statCards.map((stat) => (
           <div
             key={stat.label}
-            className="rounded-[14px] border border-[var(--lc-line)] bg-lc-surface px-4 py-4"
+            className="rounded-[14px] border border-[var(--lc-line)] bg-lc-surface px-4 py-4 transition-colors duration-200"
           >
             <p className="text-xs text-lc-muted">{stat.label}</p>
             <p className="mt-2 text-2xl font-semibold tracking-tight text-lc-ink">

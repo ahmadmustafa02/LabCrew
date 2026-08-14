@@ -21,6 +21,7 @@ type Assignment = {
 export function AssignmentsView() {
   const { role } = useSession();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,6 +36,8 @@ export function AssignmentsView() {
         }
       } catch {
         if (!cancelled) setError("Could not load assignments");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -67,7 +70,17 @@ export function AssignmentsView() {
       </div>
 
       <div className="space-y-3">
-        {assignments.length === 0 ? (
+        {loading ? (
+          <div className="space-y-3" aria-busy="true" aria-label="Loading">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-[88px] animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface"
+                style={{ animationDelay: `${i * 80}ms` }}
+              />
+            ))}
+          </div>
+        ) : assignments.length === 0 ? (
           <div className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-10 text-sm text-lc-muted">
             No assignments yet.
             {role === "director"
@@ -79,12 +92,12 @@ export function AssignmentsView() {
             <Link
               key={item.id}
               href={`/app/assignments/${item.id}`}
-              className="block rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5 transition-colors hover:bg-[#fafafa]"
+              className="block rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5 transition-[background-color,border-color,transform] duration-200 ease-out hover:border-[var(--lc-line-strong)] hover:bg-[#fafafa] active:scale-[0.995]"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-lc-ink">{item.title}</p>
-                  <p className="mt-1 text-sm text-lc-muted">
+                  <p className="mt-1 line-clamp-2 text-sm text-lc-muted">
                     {item.description || item.instructions || "No description"}
                   </p>
                   <p className="mt-2 text-xs text-lc-muted">

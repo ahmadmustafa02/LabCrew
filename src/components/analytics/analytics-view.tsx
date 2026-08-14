@@ -22,6 +22,7 @@ type Analytics = {
 
 export function AnalyticsView() {
   const [data, setData] = useState<Analytics | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,8 @@ export function AnalyticsView() {
         }
       } catch {
         if (!cancelled) setError("Analytics unavailable - is Docker running?");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -66,12 +69,7 @@ export function AnalyticsView() {
           note: `${data.nudgesRejected} rejected all-time`,
         },
       ]
-    : [
-        { label: "Submission rate", value: "—", note: "Loading…" },
-        { label: "At-risk students", value: "—", note: "Loading…" },
-        { label: "Nudges approved", value: "—", note: "Loading…" },
-        { label: "Nudges pending", value: "—", note: "Loading…" },
-      ];
+    : null;
 
   return (
     <div className="space-y-8">
@@ -91,18 +89,25 @@ export function AnalyticsView() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {cards.map((row) => (
-          <div
-            key={row.label}
-            className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5"
-          >
-            <p className="text-xs text-lc-muted">{row.label}</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-lc-ink">
-              {row.value}
-            </p>
-            <p className="mt-2 text-sm text-lc-muted">{row.note}</p>
-          </div>
-        ))}
+        {loading || !cards
+          ? [0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-[120px] animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface"
+              />
+            ))
+          : cards.map((row) => (
+              <div
+                key={row.label}
+                className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5 transition-colors duration-200"
+              >
+                <p className="text-xs text-lc-muted">{row.label}</p>
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-lc-ink">
+                  {row.value}
+                </p>
+                <p className="mt-2 text-sm text-lc-muted">{row.note}</p>
+              </div>
+            ))}
       </div>
 
       <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface">

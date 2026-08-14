@@ -7,8 +7,7 @@ import { useSession } from "@/components/session/session-provider";
 import type { AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
 import { cn } from "@/lib/cn";
 
-const inputClass =
-  "w-full rounded-[12px] border border-[var(--lc-line-strong)] bg-lc-bg px-3.5 py-2.5 text-sm text-lc-ink outline-none focus:border-lc-accent";
+const inputClass = "lc-input";
 
 type AssignmentDetail = {
   id: string;
@@ -120,7 +119,20 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
 
   if (!assignment) {
     return (
-      <p className="text-sm text-lc-muted">{error ?? "Loading assignment…"}</p>
+      <div className="space-y-6" aria-busy="true">
+        {error ? (
+          <p className="text-sm text-lc-danger">{error}</p>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <div className="h-4 w-24 animate-pulse rounded-md bg-black/[0.06]" />
+              <div className="h-9 w-72 max-w-full animate-pulse rounded-md bg-black/[0.06]" />
+              <div className="h-4 w-full max-w-md animate-pulse rounded-md bg-black/[0.04]" />
+            </div>
+            <div className="h-40 animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface" />
+          </>
+        )}
+      </div>
     );
   }
 
@@ -130,9 +142,9 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
         <div>
           <Link
             href="/app/assignments"
-            className="text-sm text-lc-muted hover:text-lc-ink"
+            className="text-sm text-lc-muted transition-colors duration-200 hover:text-lc-ink"
           >
-            Assignments
+            ← Assignments
           </Link>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
             {assignment.title}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PageTransition } from "@/components/app/page-transition";
 import { useSession } from "@/components/session/session-provider";
 import { cn } from "@/lib/cn";
 
@@ -131,7 +132,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "whitespace-nowrap rounded-[10px] px-3 py-2 text-sm",
+                    "whitespace-nowrap rounded-[10px] px-3 py-2 text-sm transition-colors duration-200",
                     active
                       ? "bg-black/[0.05] font-medium text-lc-ink"
                       : "text-lc-muted",
@@ -142,7 +143,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </div>
     </div>
