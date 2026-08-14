@@ -106,10 +106,25 @@ export async function executeWeeklyOps(runId: string) {
           return { detail: "No active milestone - nothing to score" };
         }
 
+        const rubric = (activeMilestone.rubric ?? {}) as {
+          requireEvidenceUrl?: boolean;
+          requireWriteup?: boolean;
+          requireRepoUrl?: boolean;
+          minWriteupLength?: number;
+        };
+        const requireEvidence = rubric.requireEvidenceUrl !== false;
+        const requireWriteup = rubric.requireWriteup !== false;
+        const requireRepo = Boolean(rubric.requireRepoUrl);
+        const minWriteup = rubric.minWriteupLength ?? 40;
+
+        const students = await prisma.member.findMany({
+          where: { programId, role: MemberRole.STUDENT },
+          include: { user: true },
+        });
         const rows = await prisma.submission.findMany({
           where: { milestoneId: activeMilestone.id },
-          include: { member: { include: { user: true } } },
         });
+        const byMember = new Map(rows.map((r) => [r.memberId, r]));
 
         let complete = 0;
         let weak = 0;
@@ -117,10 +132,11 @@ export async function executeWeeklyOps(runId: string) {
         const exceptions: { name: string; reason: string; severity: string }[] =
           [];
 
-        for (const row of rows) {
-          const name = row.member.user.name;
-          // Only DRAFT (or empty turn-in) is "missing". SCORED can be re-evaluated.
-          if (row.status === SubmissionStatus.DRAFT) {
+        for (const student of students) {
+          const name = student.user.name;
+          const row = byMember.get(student.id);
+
+          if (!row || row.status === SubmissionStatus.DRAFT) {
             missing += 1;
             exceptions.push({
               name,
@@ -132,29 +148,43 @@ export async function executeWeeklyOps(runId: string) {
 
           const writeup = (row.writeup ?? "").trim();
           const hasEvidence = Boolean(row.evidenceUrl);
-          if (hasEvidence && writeup.length >= 40) {
+          const hasRepo = Boolean(row.repoUrl);
+          const problems: string[] = [];
+
+          if (requireEvidence && !hasEvidence) {
+            problems.push("Demo/evidence link missing");
+          }
+          if (requireRepo && !hasRepo) {
+            problems.push("GitHub repo missing");
+          }
+          if (requireWriteup && writeup.length < minWriteup) {
+            problems.push("Writeup too thin vs rubric");
+          }
+
+          if (problems.length === 0) {
             complete += 1;
             await prisma.submission.update({
               where: { id: row.id },
               data: {
                 status: SubmissionStatus.SCORED,
-                score: { complete: true, notes: "Meets Week 4 rubric" },
+                score: {
+                  complete: true,
+                  notes: `Meets rubric for ${activeMilestone.title}`,
+                },
               },
             });
           } else {
             weak += 1;
             exceptions.push({
               name,
-              reason: !hasEvidence
-                ? "Demo link missing or unreachable"
-                : "Writeup too thin vs rubric",
-              severity: !hasEvidence ? "high" : "medium",
+              reason: problems[0],
+              severity: problems[0].includes("missing") ? "high" : "medium",
             });
             await prisma.submission.update({
               where: { id: row.id },
               data: {
                 status: SubmissionStatus.SCORED,
-                score: { complete: false, notes: "Needs revision" },
+                score: { complete: false, notes: problems.join("; ") },
               },
             });
           }

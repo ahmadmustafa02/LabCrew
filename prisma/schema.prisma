@@ -109,17 +109,23 @@ model Member {
 }
 
 model Milestone {
-  id          String          @id @default(cuid())
-  programId   String
-  program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
-  dueAt       DateTime?
-  status      MilestoneStatus @default(UPCOMING)
-  sortOrder   Int             @default(0)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  submissions Submission[]
+  id           String          @id @default(cuid())
+  programId    String
+  program      Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  /// Professor instructions shown to students
+  instructions String?
+  /// [{ id, title, kind: "link"|"file", url }]
+  materials    Json?
+  /// { requireEvidenceUrl, requireWriteup, minWriteupLength, checklist: string[] }
+  rubric       Json?
+  dueAt        DateTime?
+  status       MilestoneStatus @default(UPCOMING)
+  sortOrder    Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  submissions  Submission[]
 }
 
 model Submission {
@@ -129,7 +135,10 @@ model Submission {
   memberId    String
   member      Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
   status      SubmissionStatus @default(DRAFT)
+  /// Demo URL, docs link, etc.
   evidenceUrl String?
+  /// Optional GitHub repo for code deliverables
+  repoUrl     String?
   writeup     String?
   checklist   Json?
   score       Json?

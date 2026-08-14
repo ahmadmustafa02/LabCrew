@@ -30,11 +30,12 @@
 - Approvals API reads Coach drafts
 - SSE stream into Mission Control *(optional next polish)*
 
-## Phase 3 — Director + analytics
+## Phase 3 — Director + analytics + real internship loop
 
-- Approval board (edit / approve / reject) *(landed — send is simulated)*
-- Nudge delivery provider (Resend) *(optional later)*
-- Cohort analytics from DB + recent ops runs *(landed)*
+- Approval board (edit / approve / reject)
+- Cohort analytics from DB + recent ops runs
+- **Assignments**: professor creates tasks + materials; student submits evidence
+- Demo Director / Student role switch (auth later)
 
 ## Phase 4 — Ship
 

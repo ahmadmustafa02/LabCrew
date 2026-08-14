@@ -73,6 +73,32 @@ async function main() {
       programId: program.id,
       title: "Week 4 - Working demo + short report",
       description: "Ship a working demo link and a short methods/results writeup.",
+      instructions:
+        "Submit a public demo URL and a short writeup covering methods, results, and next steps. Optional: link your GitHub repo.",
+      materials: [
+        {
+          id: "mat-starter",
+          title: "Starter repo (example)",
+          kind: "link",
+          url: "https://github.com/example/labcrew-starter",
+        },
+        {
+          id: "mat-rubric",
+          title: "Week 4 expectations",
+          kind: "link",
+          url: "https://example.com/week4-rubric",
+        },
+      ],
+      rubric: {
+        requireEvidenceUrl: true,
+        requireWriteup: true,
+        requireRepoUrl: false,
+        minWriteupLength: 40,
+        checklist: [
+          "Demo runs locally or is publicly reachable",
+          "Short methods + results writeup",
+        ],
+      },
       status: MilestoneStatus.ACTIVE,
       sortOrder: 4,
       dueAt: new Date("2026-08-20T23:59:00.000Z"),
