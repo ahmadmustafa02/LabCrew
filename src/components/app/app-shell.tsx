@@ -2,39 +2,92 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "@/components/session/session-provider";
 import { cn } from "@/lib/cn";
-import { DEMO_PROGRAM } from "@/lib/mock-data";
-
-const NAV = [
-  { href: "/app/mission-control", label: "Mission Control" },
-  { href: "/app/approvals", label: "Approvals" },
-  { href: "/app/analytics", label: "Analytics" },
-];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const {
+    role,
+    setRole,
+    students,
+    studentMemberId,
+    setStudentMemberId,
+    programName,
+    studentName,
+  } = useSession();
+
+  const nav =
+    role === "director"
+      ? [
+          { href: "/app/mission-control", label: "Mission Control" },
+          { href: "/app/assignments", label: "Assignments" },
+          { href: "/app/approvals", label: "Approvals" },
+          { href: "/app/analytics", label: "Analytics" },
+        ]
+      : [{ href: "/app/assignments", label: "My tasks" }];
 
   return (
     <div className="min-h-full bg-lc-bg">
       <header className="sticky top-0 z-20 border-b border-[var(--lc-line)] bg-lc-surface/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-6">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-3 px-4 md:px-6">
+          <div className="flex min-w-0 items-center gap-6">
             <Link href="/" className="text-[15px] font-semibold tracking-tight">
               LabCrew
             </Link>
             <div className="hidden h-4 w-px bg-[var(--lc-line-strong)] sm:block" />
-            <div className="hidden sm:block">
-              <p className="text-sm font-medium text-lc-ink">{DEMO_PROGRAM.name}</p>
-              <p className="text-xs text-lc-muted">{DEMO_PROGRAM.org}</p>
+            <div className="hidden min-w-0 sm:block">
+              <p className="truncate text-sm font-medium text-lc-ink">
+                {programName ?? "Northwater Lab"}
+              </p>
+              <p className="text-xs text-lc-muted">
+                {role === "director"
+                  ? "Director"
+                  : `Student · ${studentName ?? "…"}`}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-xs text-lc-muted md:inline">
-              Director mode · demo
-            </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e8e8ed] text-xs font-semibold text-lc-ink">
-              DR
+
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-[10px] border border-[var(--lc-line)] bg-lc-bg p-0.5">
+              <button
+                type="button"
+                onClick={() => setRole("director")}
+                className={cn(
+                  "cursor-pointer rounded-[8px] px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  role === "director"
+                    ? "bg-lc-surface text-lc-ink"
+                    : "text-lc-muted",
+                )}
+              >
+                Director
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole("student")}
+                className={cn(
+                  "cursor-pointer rounded-[8px] px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  role === "student"
+                    ? "bg-lc-surface text-lc-ink"
+                    : "text-lc-muted",
+                )}
+              >
+                Student
+              </button>
             </div>
+            {role === "student" && students.length > 0 ? (
+              <select
+                value={studentMemberId ?? ""}
+                onChange={(e) => setStudentMemberId(e.target.value)}
+                className="hidden max-w-[160px] rounded-[10px] border border-[var(--lc-line)] bg-lc-bg px-2 py-1.5 text-xs text-lc-ink md:block"
+              >
+                {students.map((s) => (
+                  <option key={s.memberId} value={s.memberId}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
           </div>
         </div>
       </header>
@@ -42,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto flex max-w-[1400px] gap-0 md:gap-8">
         <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-52 shrink-0 border-r border-[var(--lc-line)] px-3 py-6 md:block">
           <nav className="space-y-1">
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
                 <Link
@@ -61,16 +114,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
           <div className="mt-8 rounded-[12px] border border-[var(--lc-line)] bg-lc-surface p-3">
-            <p className="text-xs font-medium text-lc-ink">Phase 1</p>
+            <p className="text-xs font-medium text-lc-ink">Demo roles</p>
             <p className="mt-1 text-xs leading-relaxed text-lc-muted">
-              UI contract with mock runs. Real workers arrive in Phase 2.
+              Switch Director / Student to walk the full internship loop without
+              full auth yet.
             </p>
           </div>
         </aside>
 
         <div className="min-w-0 flex-1 px-4 py-6 md:px-0 md:pr-6 md:py-8">
           <nav className="mb-5 flex gap-1 overflow-x-auto md:hidden">
-            {NAV.map((item) => {
+            {nav.map((item) => {
               const active = pathname.startsWith(item.href);
               return (
                 <Link
