@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { AgentRunStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import {
+  assertSameProgram,
+  requireAuth,
+  requireDirector,
+} from "@/server/auth/api-session";
 import { serializeAgentRun } from "@/server/ops/serialize-run";
 import { getOpsQueue } from "@/server/queue/ops-queue";
 
@@ -8,10 +13,11 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
+    const gate = await requireAuth();
+    if ("error" in gate) return gate.error;
+
     const { searchParams } = new URL(request.url);
     const latest = searchParams.get("latest") === "1";
-    const programIdParam = searchParams.get("programId");
-
     if (!latest) {
       return NextResponse.json(
         { ok: false, error: "Use ?latest=1 to load the most recent run" },
@@ -19,20 +25,12 @@ export async function GET(request: Request) {
       );
     }
 
+    const programId =
+      searchParams.get("programId") ?? gate.session.membership.programId;
+    const wrong = assertSameProgram(gate.session, programId);
+    if (wrong) return wrong;
+
     const prisma = getPrisma();
-    let programId = programIdParam;
-
-    if (!programId) {
-      const program = await prisma.program.findFirst({
-        where: { organization: { slug: "northwater" } },
-        orderBy: { createdAt: "asc" },
-      });
-      if (!program) {
-        return NextResponse.json({ ok: true, run: null });
-      }
-      programId = program.id;
-    }
-
     const run = await prisma.agentRun.findFirst({
       where: { programId },
       orderBy: { createdAt: "desc" },
@@ -64,27 +62,18 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const gate = await requireDirector();
+    if ("error" in gate) return gate.error;
+
     const body = (await request.json().catch(() => ({}))) as {
       programId?: string;
     };
 
+    const programId = body.programId ?? gate.session.membership.programId;
+    const wrong = assertSameProgram(gate.session, programId);
+    if (wrong) return wrong;
+
     const prisma = getPrisma();
-    let programId = body.programId;
-
-    if (!programId) {
-      const program = await prisma.program.findFirst({
-        where: { organization: { slug: "northwater" } },
-        orderBy: { createdAt: "asc" },
-      });
-      if (!program) {
-        return NextResponse.json(
-          { ok: false, error: "No demo program. Run npm run db:seed" },
-          { status: 404 },
-        );
-      }
-      programId = program.id;
-    }
-
     const run = await prisma.agentRun.create({
       data: {
         programId,

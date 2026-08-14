@@ -6,15 +6,19 @@ import {
   SubmissionStatus,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import { requireDirector } from "@/server/auth/api-session";
 import { serializeAgentRun } from "@/server/ops/serialize-run";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
+    const gate = await requireDirector();
+    if ("error" in gate) return gate.error;
+
     const prisma = getPrisma();
-    const program = await prisma.program.findFirst({
-      where: { organization: { slug: "northwater" } },
+    const program = await prisma.program.findUnique({
+      where: { id: gate.session.membership.programId },
       include: {
         milestones: {
           where: { status: MilestoneStatus.ACTIVE },
@@ -25,7 +29,7 @@ export async function GET() {
 
     if (!program) {
       return NextResponse.json(
-        { ok: false, error: "Demo program not seeded" },
+        { ok: false, error: "Program not found" },
         { status: 404 },
       );
     }

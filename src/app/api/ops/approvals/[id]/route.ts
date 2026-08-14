@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { ApprovalStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import {
+  assertSameProgram,
+  requireDirector,
+} from "@/server/auth/api-session";
 import { deliverNudge } from "@/server/email/deliver-nudge";
 
 export const runtime = "nodejs";
@@ -14,6 +18,9 @@ type Body = {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
+    const gate = await requireDirector();
+    if ("error" in gate) return gate.error;
+
     const { id } = await params;
     const input = (await request.json()) as Body;
     const action = input.action;
@@ -30,6 +37,9 @@ export async function PATCH(request: Request, { params }: Params) {
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     }
+
+    const wrong = assertSameProgram(gate.session, existing.programId);
+    if (wrong) return wrong;
 
     if (existing.status !== ApprovalStatus.PENDING) {
       return NextResponse.json(

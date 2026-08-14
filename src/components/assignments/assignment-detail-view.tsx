@@ -60,7 +60,7 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
     let cancelled = false;
     (async () => {
       const res = await fetch(
-        `/api/assignments/${assignmentId}/submit?memberId=${studentMemberId}`,
+        `/api/assignments/${assignmentId}/submit`,
       );
       const data = await res.json();
       if (cancelled || !data.ok || !data.submission) return;
@@ -86,10 +86,6 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
   const checklist = rubric?.checklist ?? [];
 
   async function submit(status: "DRAFT" | "SUBMITTED") {
-    if (!studentMemberId) {
-      setError("Pick a student identity in the header first");
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -97,7 +93,6 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          memberId: studentMemberId,
           evidenceUrl,
           repoUrl,
           writeup,

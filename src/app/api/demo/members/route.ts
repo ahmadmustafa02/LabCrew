@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { MemberRole } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import { requireDirector } from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
+    const gate = await requireDirector();
+    if ("error" in gate) return gate.error;
+
     const prisma = getPrisma();
-    const program = await prisma.program.findFirst({
-      where: { organization: { slug: "northwater" } },
+    const program = await prisma.program.findUnique({
+      where: { id: gate.session.membership.programId },
       include: {
         organization: true,
         members: {
@@ -19,7 +23,7 @@ export async function GET() {
     });
 
     if (!program) {
-      return NextResponse.json({ ok: false, error: "Program not seeded" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: "Program not found" }, { status: 404 });
     }
 
     const directors = program.members.filter(

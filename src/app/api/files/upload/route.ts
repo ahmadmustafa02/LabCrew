@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { requireDirector } from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,9 @@ const MAX_BYTES = 8 * 1024 * 1024;
 
 export async function POST(request: Request) {
   try {
+    const gate = await requireDirector();
+    if ("error" in gate) return gate.error;
+
     const form = await request.formData();
     const file = form.get("file");
     const title = String(form.get("title") ?? "").trim();

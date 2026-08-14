@@ -2,31 +2,22 @@ import { NextResponse } from "next/server";
 import { MilestoneStatus, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import type { AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
+import { requireAuth, requireDirector } from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
 
-async function getDemoProgramId() {
-  const prisma = getPrisma();
-  const program = await prisma.program.findFirst({
-    where: { organization: { slug: "northwater" } },
-    orderBy: { createdAt: "asc" },
-  });
-  return program?.id ?? null;
-}
-
 export async function GET() {
   try {
+    const gate = await requireAuth();
+    if ("error" in gate) return gate.error;
+
+    const { membership } = gate.session;
     const prisma = getPrisma();
-    const programId = await getDemoProgramId();
-    if (!programId) {
-      return NextResponse.json({ ok: false, error: "Program not seeded" }, { status: 404 });
-    }
 
     const assignments = await prisma.milestone.findMany({
-      where: { programId },
+      where: { programId: membership.programId },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
-        _count: { select: { submissions: true } },
         submissions: {
           where: { status: { in: ["SUBMITTED", "SCORED"] } },
           select: { id: true },
@@ -36,7 +27,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
-      programId,
+      programId: membership.programId,
       assignments: assignments.map((a) => ({
         id: a.id,
         title: a.title,
@@ -63,6 +54,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const gate = await requireDirector();
+    if ("error" in gate) return gate.error;
+
     const body = (await request.json()) as {
       title?: string;
       description?: string;
@@ -78,11 +72,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Title is required" }, { status: 400 });
     }
 
+    const programId = gate.session.membership.programId;
     const prisma = getPrisma();
-    const programId = await getDemoProgramId();
-    if (!programId) {
-      return NextResponse.json({ ok: false, error: "Program not seeded" }, { status: 404 });
-    }
 
     const maxSort = await prisma.milestone.aggregate({
       where: { programId },

@@ -9,6 +9,7 @@ const DIRECTOR_ONLY = [
   "/app/mission-control",
   "/app/approvals",
   "/app/analytics",
+  "/app/team",
   "/app/assignments/new",
 ];
 

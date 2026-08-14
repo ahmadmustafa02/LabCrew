@@ -23,7 +23,7 @@ export default function HomePage() {
           </Link>
           <Link href="/login">
             <Button variant="secondary" size="sm">
-              Open console
+              Sign in
             </Button>
           </Link>
         </nav>
@@ -44,14 +44,14 @@ export default function HomePage() {
             your Monday briefing. You approve what matters.
           </p>
           <div className="lc-animate-in lc-delay-3 mt-10 flex flex-wrap items-center gap-3">
-            <Link href="/login">
+            <Link href="/signup">
               <Button variant="primary" size="lg">
-                Run the demo console
+                Create your lab
               </Button>
             </Link>
             <Link href="/login">
               <Button variant="secondary" size="lg">
-                See Mission Control
+                Sign in
               </Button>
             </Link>
           </div>

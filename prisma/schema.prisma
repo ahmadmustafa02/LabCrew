@@ -81,6 +81,7 @@ model Program {
   milestones     Milestone[]
   agentRuns      AgentRun[]
   approvals      ApprovalItem[]
+  invites        Invite[]
 }
 
 model User {
@@ -201,4 +202,20 @@ model ApprovalItem {
   decidedAt   DateTime?
 
   @@index([programId, status])
+}
+
+model Invite {
+  id          String     @id @default(cuid())
+  programId   String
+  program     Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
+  email       String
+  role        MemberRole @default(STUDENT)
+  token       String     @unique
+  invitedById String?
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([programId, email])
+  @@index([token])
 }

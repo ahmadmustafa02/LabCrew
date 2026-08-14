@@ -24,6 +24,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           { href: "/app/assignments", label: "Assignments" },
           { href: "/app/approvals", label: "Approvals" },
           { href: "/app/analytics", label: "Analytics" },
+          { href: "/app/team", label: "Team" },
         ]
       : [{ href: "/app/assignments", label: "My tasks" }];
 

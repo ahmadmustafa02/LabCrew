@@ -1,20 +1,33 @@
 import { NextResponse } from "next/server";
-import { MemberRole, Prisma, SubmissionStatus } from "@prisma/client";
+import { Prisma, SubmissionStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import {
+  assertSameProgram,
+  requireStudent,
+} from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(request: Request, { params }: Params) {
+export async function GET(_request: Request, { params }: Params) {
   try {
-    const { id: milestoneId } = await params;
-    const memberId = new URL(request.url).searchParams.get("memberId");
-    if (!memberId) {
-      return NextResponse.json({ ok: false, error: "memberId required" }, { status: 400 });
-    }
+    const gate = await requireStudent();
+    if ("error" in gate) return gate.error;
 
+    const { id: milestoneId } = await params;
+    const memberId = gate.session.membership.id;
     const prisma = getPrisma();
+
+    const milestone = await prisma.milestone.findUnique({
+      where: { id: milestoneId },
+    });
+    if (!milestone) {
+      return NextResponse.json({ ok: false, error: "Assignment not found" }, { status: 404 });
+    }
+    const wrong = assertSameProgram(gate.session, milestone.programId);
+    if (wrong) return wrong;
+
     const submission = await prisma.submission.findUnique({
       where: {
         milestoneId_memberId: { milestoneId, memberId },
@@ -35,9 +48,12 @@ export async function GET(request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   try {
+    const gate = await requireStudent();
+    if ("error" in gate) return gate.error;
+
     const { id: milestoneId } = await params;
+    const memberId = gate.session.membership.id;
     const body = (await request.json()) as {
-      memberId?: string;
       evidenceUrl?: string;
       repoUrl?: string;
       writeup?: string;
@@ -45,25 +61,16 @@ export async function POST(request: Request, { params }: Params) {
       status?: "DRAFT" | "SUBMITTED";
     };
 
-    if (!body.memberId) {
-      return NextResponse.json({ ok: false, error: "memberId required" }, { status: 400 });
-    }
-
     const prisma = getPrisma();
-    const [milestone, member] = await Promise.all([
-      prisma.milestone.findUnique({ where: { id: milestoneId } }),
-      prisma.member.findUnique({ where: { id: body.memberId } }),
-    ]);
+    const milestone = await prisma.milestone.findUnique({
+      where: { id: milestoneId },
+    });
 
     if (!milestone) {
       return NextResponse.json({ ok: false, error: "Assignment not found" }, { status: 404 });
     }
-    if (!member || member.role !== MemberRole.STUDENT) {
-      return NextResponse.json({ ok: false, error: "Invalid student member" }, { status: 400 });
-    }
-    if (member.programId !== milestone.programId) {
-      return NextResponse.json({ ok: false, error: "Student not in this program" }, { status: 400 });
-    }
+    const wrong = assertSameProgram(gate.session, milestone.programId);
+    if (wrong) return wrong;
 
     const status =
       body.status === "DRAFT" ? SubmissionStatus.DRAFT : SubmissionStatus.SUBMITTED;
@@ -75,19 +82,15 @@ export async function POST(request: Request, { params }: Params) {
       checklist: (body.checklist ?? []) as Prisma.InputJsonValue,
       status,
       submittedAt: status === SubmissionStatus.SUBMITTED ? new Date() : null,
-      score: status === SubmissionStatus.SUBMITTED ? Prisma.DbNull : undefined,
     };
 
     const submission = await prisma.submission.upsert({
       where: {
-        milestoneId_memberId: {
-          milestoneId,
-          memberId: body.memberId,
-        },
+        milestoneId_memberId: { milestoneId, memberId },
       },
       create: {
         milestoneId,
-        memberId: body.memberId,
+        memberId,
         evidenceUrl: data.evidenceUrl,
         repoUrl: data.repoUrl,
         writeup: data.writeup,

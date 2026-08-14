@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
+import {
+  assertSameProgram,
+  requireAuth,
+} from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
 
@@ -7,6 +11,9 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, { params }: Params) {
   try {
+    const gate = await requireAuth();
+    if ("error" in gate) return gate.error;
+
     const { id } = await params;
     const prisma = getPrisma();
     const assignment = await prisma.milestone.findUnique({
@@ -25,6 +32,16 @@ export async function GET(_request: Request, { params }: Params) {
       return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     }
 
+    const wrong = assertSameProgram(gate.session, assignment.programId);
+    if (wrong) return wrong;
+
+    const isDirector = gate.session.appRole === "director";
+    const myMemberId = gate.session.membership.id;
+
+    const submissions = isDirector
+      ? assignment.submissions
+      : assignment.submissions.filter((s) => s.memberId === myMemberId);
+
     return NextResponse.json({
       ok: true,
       assignment: {
@@ -37,7 +54,7 @@ export async function GET(_request: Request, { params }: Params) {
         rubric: assignment.rubric,
         dueAt: assignment.dueAt,
         status: assignment.status,
-        submissions: assignment.submissions.map((s) => ({
+        submissions: submissions.map((s) => ({
           id: s.id,
           memberId: s.memberId,
           studentName: s.member.user.name,

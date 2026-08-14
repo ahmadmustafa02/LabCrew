@@ -23,54 +23,40 @@ Humans direct. Agents run the weekly ops loop.
 
 See [docs/PHASES.md](./docs/PHASES.md) and [docs/DESIGN.md](./docs/DESIGN.md).
 
-## 2-minute demo walkthrough
+## Real product flow
 
-1. **Start stack** (pick one)
-   - Local: `docker compose up -d postgres redis` → `npm run db:push` → `npm run db:seed` → `npm run worker` → `npm run dev`
-   - Full Docker: `docker compose up --build`
-2. Open [http://localhost:3000/login](http://localhost:3000/login)
-3. Sign in as **Director Reed** (`director@northwater.lab` / `labcrew`)
-4. Open **Monday Brief** (home) → empty or last packet
-5. **Mission Control** → **Run weekly ops** → watch Pulse → Referee → Coach → Clerk
-6. **Approvals** → edit/approve a nudge (check terminal for simulated email)
-7. Sign out → sign in as **Ayesha** → **My tasks** → submit evidence URL + writeup
-8. Back as Director → run weekly ops again → Brief shows updated on-track / exceptions
+1. **Create lab** — [http://localhost:3000/signup](http://localhost:3000/signup) (org + director in Postgres)
+2. **Invite students** — Team → create invite → copy join link
+3. **Student joins** — `/join?token=…` sets their own password
+4. Assignments → submit → weekly ops → approvals → Monday Brief
 
-## Develop (host Node)
+All APIs require a signed-in session and are scoped to **your** program.
+
+### Optional Northwater demo seed
 
 ```bash
-npm install
-cp .env.example .env   # Windows: copy .env.example .env
-docker compose up -d postgres redis
-npm run db:generate
-npm run db:push
-npm run db:seed
-npm run worker         # separate terminal
-npm run dev
+npm run db:seed   # demo lab only; password labcrew
 ```
-
-## Full Docker (web + worker + DB)
-
-```bash
-cp .env.example .env
-docker compose up --build
-```
-
-App: [http://localhost:3000](http://localhost:3000)  
-Migrate+seed runs once via the `migrate` service.
-
-### Demo accounts
 
 | Role | Email | Password |
 | ---- | ----- | -------- |
 | Director | `director@northwater.lab` | `labcrew` |
 | Student | `ayesha.rahman@students.northwater.lab` | `labcrew` |
 
-All seeded students use password `labcrew`.
+## Develop (host Node)
 
-### Optional email
+```bash
+npm install
+cp .env.example .env
+docker compose up -d postgres redis
+npm run db:generate
+npm run db:push
+npm run worker
+npm run dev
+```
 
-Set `RESEND_API_KEY`, `EMAIL_FROM`, and `NUDGE_TEST_TO` to send approved nudges for real. Without them, Approve logs to the server console.
+Then open `/signup` for a real lab, or seed + `/login` for the Northwater walkthrough.
+
 
 ## Product rules
 

@@ -141,8 +141,13 @@ function LoginFormInner() {
         </form>
 
         <p className="mt-8 text-center text-sm text-lc-muted">
+          New lab?{" "}
+          <Link href="/signup" className="text-lc-ink hover:underline">
+            Create an account
+          </Link>
+          <span className="mx-2 text-[var(--lc-line-strong)]">·</span>
           <Link href="/" className="transition-colors hover:text-lc-ink">
-            ← Return to marketing site
+            ← Home
           </Link>
         </p>
       </div>
