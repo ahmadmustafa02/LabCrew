@@ -101,8 +101,13 @@ export function NewAssignmentView() {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <div>
-        <p className="text-sm text-lc-muted">New assignment</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
+        <Link
+          href="/app/assignments"
+          className="text-sm text-lc-muted transition-colors duration-200 hover:text-lc-ink"
+        >
+          ← Assignments
+        </Link>
+        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
           Create a research task
         </h1>
         <p className="mt-2 text-[15px] leading-relaxed text-lc-muted">

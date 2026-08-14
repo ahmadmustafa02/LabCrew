@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AuthProvider } from "@/components/session/auth-provider";
+import { cn } from "@/lib/cn";
 
 const DEMOS = [
   {
@@ -45,9 +46,7 @@ function LoginFormInner() {
     });
     setBusy(false);
     if (res?.error) {
-      setError(
-        "Invalid email or password. Seed the DB if this is a fresh install.",
-      );
+      setError("Invalid email or password. Try a demo account above.");
       return;
     }
     router.replace(next);
@@ -62,32 +61,51 @@ function LoginFormInner() {
         style={{ background: "var(--lc-halo)" }}
       />
       <div className="relative z-10 mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-6 py-16">
-        <Link
-          href="/"
-          className="text-[17px] font-semibold tracking-tight text-lc-ink"
-        >
-          LabCrew
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="text-[17px] font-semibold tracking-tight text-lc-ink"
+          >
+            LabCrew
+          </Link>
+          <Link
+            href="/"
+            className="text-sm text-lc-muted transition-colors hover:text-lc-ink"
+          >
+            ← Back to home
+          </Link>
+        </div>
         <h1 className="mt-8 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
           Sign in
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-lc-muted">{subtitle}</p>
 
         <div className="mt-6 space-y-2">
-          {DEMOS.map((demo) => (
-            <button
-              key={demo.email}
-              type="button"
-              onClick={() => {
-                setEmail(demo.email);
-                setPassword("labcrew");
-              }}
-              className="flex w-full cursor-pointer flex-col rounded-[12px] border border-[var(--lc-line)] bg-lc-surface px-4 py-3 text-left transition-colors hover:bg-[#fafafa]"
-            >
-              <span className="text-sm font-medium text-lc-ink">{demo.label}</span>
-              <span className="mt-0.5 text-xs text-lc-muted">{demo.hint}</span>
-            </button>
-          ))}
+          {DEMOS.map((demo) => {
+            const selected = email === demo.email;
+            return (
+              <button
+                key={demo.email}
+                type="button"
+                onClick={() => {
+                  setEmail(demo.email);
+                  setPassword("labcrew");
+                  setError(null);
+                }}
+                className={cn(
+                  "flex w-full cursor-pointer flex-col rounded-[12px] border px-4 py-3 text-left transition-colors",
+                  selected
+                    ? "border-lc-accent bg-[var(--lc-accent-soft)]"
+                    : "border-[var(--lc-line)] bg-lc-surface hover:bg-[#fafafa]",
+                )}
+              >
+                <span className="text-sm font-medium text-lc-ink">
+                  {demo.label}
+                </span>
+                <span className="mt-0.5 text-xs text-lc-muted">{demo.hint}</span>
+              </button>
+            );
+          })}
         </div>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-3">
@@ -121,6 +139,12 @@ function LoginFormInner() {
             {busy ? "Signing in…" : "Continue"}
           </Button>
         </form>
+
+        <p className="mt-8 text-center text-sm text-lc-muted">
+          <Link href="/" className="transition-colors hover:text-lc-ink">
+            ← Return to marketing site
+          </Link>
+        </p>
       </div>
     </div>
   );

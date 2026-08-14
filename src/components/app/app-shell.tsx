@@ -48,13 +48,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void signOutUser()}
-            className="cursor-pointer rounded-[10px] px-3 py-1.5 text-xs font-medium text-lc-muted transition-colors hover:bg-black/[0.04] hover:text-lc-ink"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void signOutUser()}
+              className="cursor-pointer rounded-[10px] px-3 py-1.5 text-xs font-medium text-lc-muted transition-colors hover:bg-black/[0.04] hover:text-lc-ink"
+            >
+              Switch account
+            </button>
+          </div>
         </div>
       </header>
 
@@ -62,7 +64,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-52 shrink-0 border-r border-[var(--lc-line)] px-3 py-6 md:block">
           <nav className="space-y-1">
             {nav.map((item) => {
-              const active = pathname.startsWith(item.href);
+              const active =
+                item.href === "/app/assignments"
+                  ? pathname.startsWith("/app/assignments")
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}
@@ -84,7 +89,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="min-w-0 flex-1 px-4 py-6 md:px-0 md:pr-6 md:py-8">
           <nav className="mb-5 flex gap-1 overflow-x-auto md:hidden">
             {nav.map((item) => {
-              const active = pathname.startsWith(item.href);
+              const active =
+                item.href === "/app/assignments"
+                  ? pathname.startsWith("/app/assignments")
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.href}

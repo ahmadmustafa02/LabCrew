@@ -257,9 +257,9 @@ export function ApprovalsView() {
         </div>
       )}
 
-      <Link href="/app/mission-control">
+      <Link href="/app/brief">
         <Button variant="ghost" size="sm">
-          Back to Mission Control
+          ← Back to Monday Brief
         </Button>
       </Link>
     </div>
