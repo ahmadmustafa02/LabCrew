@@ -5,9 +5,6 @@ Humans direct. Agents collect signals, score evidence, draft nudges, and prepare
 
 <br/>
 
-<img width="1539" height="956" alt="image" src="https://github.com/user-attachments/assets/bbf07ebb-1d43-4a01-95e6-6ceec6b6f80a" />
-
-
 <p align="center">
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js_16-black?style=flat-square&logo=nextdotjs&logoColor=white" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" />
@@ -16,6 +13,8 @@ Humans direct. Agents collect signals, score evidence, draft nudges, and prepare
   <img alt="Prisma" src="https://img.shields.io/badge/Prisma_7-2D3748?style=flat-square&logo=prisma&logoColor=white" />
   <img alt="License" src="https://img.shields.io/badge/License-Private-6e6e73?style=flat-square" />
 </p>
+
+<img width="1539" height="956" alt="image" src="https://github.com/user-attachments/assets/bbf07ebb-1d43-4a01-95e6-6ceec6b6f80a" />
 
 <br/>
 
