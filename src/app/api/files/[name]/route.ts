@@ -1,7 +1,9 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/server/auth/api-session";
+import { getPrisma } from "@/lib/db";
+import {
+  assertSameProgram,
+  requireAuth,
+} from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
 
@@ -17,22 +19,20 @@ export async function GET(_request: Request, { params }: Params) {
       return NextResponse.json({ ok: false, error: "Invalid file" }, { status: 400 });
     }
 
-    const filePath = path.join(process.cwd(), "storage", "materials", name);
-    const data = await readFile(filePath);
-    const ext = path.extname(name).toLowerCase();
-    const type =
-      ext === ".pdf"
-        ? "application/pdf"
-        : ext === ".png"
-          ? "image/png"
-          : ext === ".jpg" || ext === ".jpeg"
-            ? "image/jpeg"
-            : "application/octet-stream";
+    const prisma = getPrisma();
+    const file = await prisma.storedFile.findUnique({ where: { filename: name } });
+    if (!file) {
+      return NextResponse.json({ ok: false, error: "File not found" }, { status: 404 });
+    }
 
-    return new NextResponse(data, {
+    const wrong = assertSameProgram(gate.session, file.programId);
+    if (wrong) return wrong;
+
+    return new NextResponse(new Uint8Array(file.data), {
       headers: {
-        "Content-Type": type,
-        "Content-Disposition": `inline; filename="${name}"`,
+        "Content-Type": file.contentType,
+        "Content-Disposition": `inline; filename="${file.originalName}"`,
+        "Content-Length": String(file.size),
       },
     });
   } catch {

@@ -1,67 +1,44 @@
-type SendResult =
-  | { ok: true; channel: "resend" | "console"; id?: string }
-  | { ok: false; error: string };
+import { sendMail, type MailResult } from "@/server/email/mailer";
+import { getPrisma } from "@/lib/db";
 
 /**
- * Deliver an approved Coach nudge.
- * Uses Resend when RESEND_API_KEY is set; otherwise logs to the server console.
+ * Deliver an approved Coach nudge to the real student email when known.
+ * Free path: SMTP if configured, otherwise server console.
  */
 export async function deliverNudge(input: {
+  programId: string;
   toName: string | null;
+  toEmail?: string | null;
   subject: string;
   body: string;
-}): Promise<SendResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from =
-    process.env.EMAIL_FROM?.trim() || "LabCrew <ops@labcrew.local>";
-  const toEmail = process.env.NUDGE_TEST_TO?.trim();
+}): Promise<MailResult & { to?: string }> {
+  let to = input.toEmail?.trim().toLowerCase() || null;
 
-  if (!apiKey) {
-    console.log(
-      "[email] simulated nudge send",
-      JSON.stringify(
-        {
-          toName: input.toName,
-          subject: input.subject,
-          body: input.body.slice(0, 240),
-        },
-        null,
-        2,
-      ),
-    );
-    return { ok: true, channel: "console" };
-  }
-
-  if (!toEmail) {
-    return {
-      ok: false,
-      error: "RESEND_API_KEY set but NUDGE_TEST_TO missing",
-    };
-  }
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+  if (!to && input.toName) {
+    const prisma = getPrisma();
+    const member = await prisma.member.findFirst({
+      where: {
+        programId: input.programId,
+        user: { name: input.toName },
       },
-      body: JSON.stringify({
-        from,
-        to: [toEmail],
-        subject: input.subject,
-        text: `Hi ${input.toName ?? "there"},\n\n${input.body}\n\n— LabCrew`,
-      }),
+      include: { user: true },
     });
-    const data = (await res.json()) as { id?: string; message?: string };
-    if (!res.ok) {
-      return { ok: false, error: data.message ?? "Resend failed" };
-    }
-    return { ok: true, channel: "resend", id: data.id };
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Send failed",
-    };
+    to = member?.user.email ?? null;
   }
+
+  if (!to) {
+    console.log("[mail] nudge has no student email", {
+      toName: input.toName,
+      subject: input.subject,
+    });
+    return { ok: false, error: "No student email on file for this nudge" };
+  }
+
+  const result = await sendMail({
+    to,
+    subject: input.subject,
+    text: `Hi ${input.toName ?? "there"},\n\n${input.body}\n\n— LabCrew`,
+  });
+
+  return { ...result, to };
 }

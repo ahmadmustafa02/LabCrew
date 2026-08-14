@@ -96,6 +96,14 @@ function LoginFormInner() {
             required
           />
         </label>
+        <div className="flex justify-end">
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-lc-muted transition-colors hover:text-lc-ink"
+          >
+            Forgot password?
+          </Link>
+        </div>
         {error ? <p className="text-sm text-lc-danger">{error}</p> : null}
         <Button
           type="submit"

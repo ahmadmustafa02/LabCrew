@@ -23,25 +23,14 @@ Humans direct. Agents run the weekly ops loop.
 
 See [docs/PHASES.md](./docs/PHASES.md) and [docs/DESIGN.md](./docs/DESIGN.md).
 
-## Real product flow
+See [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) for **$0 self-host** (Docker), free Gmail SMTP, and free Google OAuth.
 
-1. **Create lab** — [http://localhost:3000/signup](http://localhost:3000/signup) (org + director in Postgres)
-2. **Invite students** — Team → create invite → copy join link
-3. **Student joins** — `/join?token=…` sets their own password
-4. Assignments → submit → weekly ops → approvals → Monday Brief
+## Free product features
 
-All APIs require a signed-in session and are scoped to **your** program.
-
-### Optional Northwater demo seed
-
-```bash
-npm run db:seed   # demo lab only; password labcrew
-```
-
-| Role | Email | Password |
-| ---- | ----- | -------- |
-| Director | `director@northwater.lab` | `labcrew` |
-| Student | `ayesha.rahman@students.northwater.lab` | `labcrew` |
+- Signup / invites / Google (optional)
+- Password reset (on-page link if no SMTP)
+- Files stored in Postgres (no S3)
+- Nudges email students when SMTP is set; otherwise console
 
 ## Develop (host Node)
 
@@ -49,13 +38,12 @@ npm run db:seed   # demo lab only; password labcrew
 npm install
 cp .env.example .env
 docker compose up -d postgres redis
-npm run db:generate
-npm run db:push
+npx prisma migrate deploy || npm run db:push
 npm run worker
 npm run dev
 ```
 
-Then open `/signup` for a real lab, or seed + `/login` for the Northwater walkthrough.
+Then open `/signup`.
 
 
 ## Product rules

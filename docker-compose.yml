@@ -38,7 +38,7 @@ services:
     container_name: labcrew-migrate
     environment:
       DATABASE_URL: postgresql://labcrew:labcrew@postgres:5432/labcrew?schema=public
-    command: sh -c "npx prisma db push && npx tsx prisma/seed.ts"
+    command: sh -c "npx prisma migrate deploy || npx prisma db push; npx tsx prisma/seed.ts"
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,9 +57,13 @@ services:
       REDIS_URL: redis://redis:6379
       AUTH_SECRET: ${AUTH_SECRET:-labcrew-dev-secret-change-me}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
+      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-LabCrew <ops@labcrew.local>}
-      NUDGE_TEST_TO: ${NUDGE_TEST_TO:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

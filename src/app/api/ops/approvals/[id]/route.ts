@@ -82,7 +82,9 @@ export async function PATCH(request: Request, { params }: Params) {
     let delivery = null;
     if (action === "approve") {
       const result = await deliverNudge({
+        programId: updated.programId,
         toName: updated.targetName,
+        toEmail: updated.targetEmail,
         subject: updated.title,
         body: updated.body,
       });

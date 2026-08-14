@@ -33,6 +33,8 @@ async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   await prisma.approvalItem.deleteMany();
+  await prisma.storedFile.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
   await prisma.invite.deleteMany();
   await prisma.agentStep.deleteMany();
   await prisma.agentRun.deleteMany();

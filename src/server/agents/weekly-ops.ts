@@ -144,17 +144,23 @@ export async function executeWeeklyOps(runId: string) {
         let complete = 0;
         let weak = 0;
         let missing = 0;
-        const exceptions: { name: string; reason: string; severity: string }[] =
-          [];
+        const exceptions: {
+          name: string;
+          email: string;
+          reason: string;
+          severity: string;
+        }[] = [];
 
         for (const student of students) {
           const name = student.user.name;
+          const email = student.user.email;
           const row = byMember.get(student.id);
 
           if (!row || row.status === SubmissionStatus.DRAFT) {
             missing += 1;
             exceptions.push({
               name,
+              email,
               reason: "No submission - milestone still open",
               severity: "high",
             });
@@ -204,6 +210,7 @@ export async function executeWeeklyOps(runId: string) {
             weak += 1;
             exceptions.push({
               name,
+              email,
               reason: problems[0],
               severity: problems[0].includes("missing") ? "high" : "medium",
             });
@@ -232,7 +239,12 @@ export async function executeWeeklyOps(runId: string) {
           orderBy: { sortOrder: "desc" },
         });
         const payload = (refereeStep?.payload ?? {}) as {
-          exceptions?: { name: string; reason: string; severity: string }[];
+          exceptions?: {
+            name: string;
+            email?: string;
+            reason: string;
+            severity: string;
+          }[];
         };
         const exceptions = payload.exceptions ?? [];
 
@@ -254,6 +266,7 @@ export async function executeWeeklyOps(runId: string) {
               title: `Nudge - ${item.name}`,
               body,
               targetName: item.name,
+              targetEmail: item.email ?? null,
               status: ApprovalStatus.PENDING,
             },
           });

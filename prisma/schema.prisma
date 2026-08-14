@@ -82,6 +82,7 @@ model Program {
   agentRuns      AgentRun[]
   approvals      ApprovalItem[]
   invites        Invite[]
+  files          StoredFile[]
 }
 
 model User {
@@ -93,6 +94,19 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   members      Member[]
+  resetTokens  PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Member {
@@ -197,6 +211,8 @@ model ApprovalItem {
   title       String
   body        String
   targetName  String?
+  /// Student email when known — used for free SMTP/console delivery
+  targetEmail String?
   status      ApprovalStatus @default(PENDING)
   createdAt   DateTime       @default(now())
   decidedAt   DateTime?
@@ -218,4 +234,20 @@ model Invite {
 
   @@index([programId, email])
   @@index([token])
+}
+
+/// Durable free file storage in Postgres (no S3). Disk is an optional cache.
+model StoredFile {
+  id           String   @id @default(cuid())
+  programId    String
+  program      Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  filename     String   @unique
+  originalName String
+  contentType  String
+  size         Int
+  data         Bytes
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([programId])
 }

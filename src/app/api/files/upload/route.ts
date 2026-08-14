@@ -1,7 +1,7 @@
-import { mkdir, writeFile } from "fs/promises";
+import { randomUUID } from "crypto";
 import path from "path";
 import { NextResponse } from "next/server";
-import { randomUUID } from "crypto";
+import { getPrisma } from "@/lib/db";
 import { requireDirector } from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
@@ -21,17 +21,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "file required" }, { status: 400 });
     }
     if (file.size > MAX_BYTES) {
-      return NextResponse.json({ ok: false, error: "File too large (max 8MB)" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "File too large (max 8MB)" },
+        { status: 400 },
+      );
     }
 
     const ext = path.extname(file.name) || ".bin";
     const safeExt = ext.slice(0, 12);
     const id = randomUUID();
     const filename = `${id}${safeExt}`;
-    const dir = path.join(process.cwd(), "storage", "materials");
-    await mkdir(dir, { recursive: true });
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(path.join(dir, filename), buffer);
+    const contentType = file.type || "application/octet-stream";
+
+    const prisma = getPrisma();
+    await prisma.storedFile.create({
+      data: {
+        programId: gate.session.membership.programId,
+        filename,
+        originalName: file.name,
+        contentType,
+        size: file.size,
+        data: buffer,
+        uploadedById: gate.session.userId,
+      },
+    });
 
     return NextResponse.json({
       ok: true,
