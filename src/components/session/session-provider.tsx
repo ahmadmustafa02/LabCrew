@@ -8,107 +8,48 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  ROLE_STORAGE_KEY,
-  STUDENT_MEMBER_STORAGE_KEY,
-  type SessionRole,
-} from "@/lib/assignment-types";
-
-type StudentOption = { memberId: string; name: string; email: string };
+import { signOut, useSession as useAuthSession } from "next-auth/react";
+import type { AppRole } from "@/auth.config";
 
 type SessionState = {
-  role: SessionRole;
+  role: AppRole;
   studentMemberId: string | null;
   studentName: string | null;
-  students: StudentOption[];
   programName: string | null;
+  userName: string | null;
+  userEmail: string | null;
   ready: boolean;
-  setRole: (role: SessionRole) => void;
-  setStudentMemberId: (id: string) => void;
-  refresh: () => Promise<void>;
+  signOutUser: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionState | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRoleState] = useState<SessionRole>("director");
-  const [studentMemberId, setStudentIdState] = useState<string | null>(null);
-  const [students, setStudents] = useState<StudentOption[]>([]);
-  const [programName, setProgramName] = useState<string | null>(null);
+  const { data, status } = useAuthSession();
   const [ready, setReady] = useState(false);
 
-  const refresh = useCallback(async () => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 5000);
-    try {
-      const res = await fetch("/api/demo/members", { signal: controller.signal });
-      const data = await res.json();
-      if (!data.ok) return;
-      setProgramName(data.program.name);
-      setStudents(data.students);
-      const storedStudent = window.localStorage.getItem(STUDENT_MEMBER_STORAGE_KEY);
-      const valid =
-        data.students.find((s: StudentOption) => s.memberId === storedStudent) ??
-        data.students[0];
-      if (valid) {
-        setStudentIdState(valid.memberId);
-        window.localStorage.setItem(STUDENT_MEMBER_STORAGE_KEY, valid.memberId);
-      }
-    } catch {
-      // offline / unseeded / slow DB — still unlock UI
-    } finally {
-      window.clearTimeout(timer);
-      setReady(true);
-    }
-  }, []);
-
   useEffect(() => {
-    const storedRole = window.localStorage.getItem(ROLE_STORAGE_KEY);
-    if (storedRole === "student" || storedRole === "director") {
-      setRoleState(storedRole);
-    }
-    void refresh();
-  }, [refresh]);
+    if (status !== "loading") setReady(true);
+  }, [status]);
 
-  const setRole = useCallback((next: SessionRole) => {
-    setRoleState(next);
-    window.localStorage.setItem(ROLE_STORAGE_KEY, next);
+  const signOutUser = useCallback(async () => {
+    await signOut({ callbackUrl: "/login" });
   }, []);
 
-  const setStudentMemberId = useCallback((id: string) => {
-    setStudentIdState(id);
-    window.localStorage.setItem(STUDENT_MEMBER_STORAGE_KEY, id);
-  }, []);
-
-  const studentName = useMemo(
-    () => students.find((s) => s.memberId === studentMemberId)?.name ?? null,
-    [students, studentMemberId],
-  );
-
-  const value = useMemo(
-    () => ({
+  const value = useMemo<SessionState>(() => {
+    const role = (data?.user?.role as AppRole) ?? "director";
+    return {
       role,
-      studentMemberId,
-      studentName,
-      students,
-      programName,
+      studentMemberId:
+        role === "student" ? (data?.user?.memberId ?? null) : null,
+      studentName: role === "student" ? (data?.user?.name ?? null) : null,
+      programName: data?.user?.programName ?? null,
+      userName: data?.user?.name ?? null,
+      userEmail: data?.user?.email ?? null,
       ready,
-      setRole,
-      setStudentMemberId,
-      refresh,
-    }),
-    [
-      role,
-      studentMemberId,
-      studentName,
-      students,
-      programName,
-      ready,
-      setRole,
-      setStudentMemberId,
-      refresh,
-    ],
-  );
+      signOutUser,
+    };
+  }, [data, ready, signOutUser]);
 
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

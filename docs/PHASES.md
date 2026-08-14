@@ -5,40 +5,36 @@
 - Product positioning, design tokens, phase plan
 - Explicit non-goals (no PR review, no fake agents in prod path)
 
-## Phase 1 — Platform shell (current)
-
-**In**
+## Phase 1 — Platform shell (done)
 
 - Next.js app + design system
-- Marketing landing (brand-first)
-- App shell: Mission Control, Approvals, Analytics routes
-- Mission Control **UI with mock run data** + step replay
-- Prisma schema (models only; DB connect next)
-- `docker compose` for Postgres + Redis
+- Marketing landing + app shell
+- Mission Control UI
+- Prisma schema + docker compose Postgres/Redis
 
-**Out**
+## Phase 2 — Agent runtime (done)
 
-- Real BullMQ workers
-- LLM calls
-- Auth (stub “Director” session for UI)
+- Redis + BullMQ worker
+- Dispatcher → Pulse → Referee → Coach → Clerk
+- Mission Control enqueue + poll
 
-## Phase 2 — Agent runtime
+## Phase 3 — Director loop (done)
 
-- Redis + BullMQ worker process
-- Dispatcher -> Pulse -> Referee -> Coach -> Clerk *(persists AgentRun/AgentStep)*
-- Enqueue from Mission Control "Run weekly ops" + poll run status
-- Approvals API reads Coach drafts
-- SSE stream into Mission Control *(optional next polish)*
+- Approvals (edit / approve / reject)
+- Analytics
+- Assignments + student submit
+- Monday Brief as director home
 
-## Phase 3 — Director + analytics + real internship loop
+## Phase 4 — Ship (done)
 
-- Approval board (edit / approve / reject)
-- Cohort analytics from DB + recent ops runs
-- **Assignments**: professor creates tasks + materials; student submits evidence
-- Demo Director / Student role switch (auth later)
+- Auth.js credentials login
+- Docker Compose: postgres, redis, migrate, web, worker
+- Optional Resend on approve
+- README 2-minute walkthrough
 
-## Phase 4 — Ship
+## Optional next (post-v1)
 
-- Docker Compose (web, worker, postgres, redis)
-- Production deploy
-- Seed demo + 2-min walkthrough
+- Production host (Fly / Railway / VPS) with managed Postgres+Redis
+- Real LLM Referee/Coach prompts
+- PDF/repo deep evidence briefs
+- SSE live step stream

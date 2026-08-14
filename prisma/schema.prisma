@@ -84,12 +84,14 @@ model Program {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  members   Member[]
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  /// bcrypt hash — demo password is "labcrew" for all seeded accounts
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  members      Member[]
 }
 
 model Member {

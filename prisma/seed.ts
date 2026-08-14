@@ -6,10 +6,13 @@ import {
   MilestoneStatus,
   SubmissionStatus,
 } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+
+const DEMO_PASSWORD = "labcrew";
 
 const STUDENTS = [
   "Ayesha Rahman",
@@ -27,6 +30,8 @@ const STUDENTS = [
 ];
 
 async function main() {
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+
   await prisma.approvalItem.deleteMany();
   await prisma.agentStep.deleteMany();
   await prisma.agentRun.deleteMany();
@@ -56,6 +61,7 @@ async function main() {
     data: {
       email: "director@northwater.lab",
       name: "Director Reed",
+      passwordHash,
     },
   });
 
@@ -111,6 +117,7 @@ async function main() {
       data: {
         email: `${slug}@students.northwater.lab`,
         name,
+        passwordHash,
       },
     });
 
@@ -123,7 +130,6 @@ async function main() {
       },
     });
 
-    // Demo exceptions: missing / weak writeup / missing evidence
     let status: SubmissionStatus = SubmissionStatus.SUBMITTED;
     let evidenceUrl: string | null = `https://demo.northwater.lab/${slug}`;
     let writeup: string | null =
@@ -158,6 +164,10 @@ async function main() {
   console.log(`Organization: ${org.slug}`);
   console.log(`Program: ${program.name}`);
   console.log(`Students: ${STUDENTS.length}`);
+  console.log(`Login: director@northwater.lab / ${DEMO_PASSWORD}`);
+  console.log(
+    `Student: ayesha.rahman@students.northwater.lab / ${DEMO_PASSWORD}`,
+  );
 }
 
 main()

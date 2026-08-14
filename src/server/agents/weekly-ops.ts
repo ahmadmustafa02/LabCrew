@@ -12,6 +12,21 @@ import { getPrisma } from "../../lib/db";
 
 const STEP_PAUSE_MS = 450;
 
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function looksLikeWriteup(text: string) {
+  const lower = text.toLowerCase();
+  const signals = ["method", "result", "next", "finding", "approach", "demo"];
+  return signals.some((s) => lower.includes(s)) || text.split(/\s+/).length >= 25;
+}
+
 type StepDef = {
   agent: AgentName;
   title: string;
@@ -147,18 +162,30 @@ export async function executeWeeklyOps(runId: string) {
           }
 
           const writeup = (row.writeup ?? "").trim();
-          const hasEvidence = Boolean(row.evidenceUrl);
-          const hasRepo = Boolean(row.repoUrl);
+          const evidenceUrl = (row.evidenceUrl ?? "").trim();
+          const repoUrl = (row.repoUrl ?? "").trim();
+          const hasEvidence = Boolean(evidenceUrl);
+          const hasRepo = Boolean(repoUrl);
           const problems: string[] = [];
 
           if (requireEvidence && !hasEvidence) {
             problems.push("Demo/evidence link missing");
+          } else if (requireEvidence && hasEvidence && !isHttpUrl(evidenceUrl)) {
+            problems.push("Evidence URL is not a valid http(s) link");
           }
           if (requireRepo && !hasRepo) {
             problems.push("GitHub repo missing");
+          } else if (requireRepo && hasRepo && !isHttpUrl(repoUrl)) {
+            problems.push("Repo URL is not a valid http(s) link");
           }
           if (requireWriteup && writeup.length < minWriteup) {
             problems.push("Writeup too thin vs rubric");
+          } else if (
+            requireWriteup &&
+            writeup.length >= minWriteup &&
+            !looksLikeWriteup(writeup)
+          ) {
+            problems.push("Writeup lacks methods/results signal");
           }
 
           if (problems.length === 0) {

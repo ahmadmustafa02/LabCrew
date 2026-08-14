@@ -10,12 +10,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const {
     role,
-    setRole,
-    students,
-    studentMemberId,
-    setStudentMemberId,
     programName,
     studentName,
+    userName,
+    signOutUser,
   } = useSession();
 
   const nav =
@@ -34,7 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-20 border-b border-[var(--lc-line)] bg-lc-surface/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-3 px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-6">
-            <Link href="/" className="text-[15px] font-semibold tracking-tight">
+            <Link href="/app" className="text-[15px] font-semibold tracking-tight">
               LabCrew
             </Link>
             <div className="hidden h-4 w-px bg-[var(--lc-line-strong)] sm:block" />
@@ -44,53 +42,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </p>
               <p className="text-xs text-lc-muted">
                 {role === "director"
-                  ? "Director"
-                  : `Student · ${studentName ?? "…"}`}
+                  ? `Director · ${userName ?? "…"}`
+                  : `Student · ${studentName ?? userName ?? "…"}`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex rounded-[10px] border border-[var(--lc-line)] bg-lc-bg p-0.5">
-              <button
-                type="button"
-                onClick={() => setRole("director")}
-                className={cn(
-                  "cursor-pointer rounded-[8px] px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  role === "director"
-                    ? "bg-lc-surface text-lc-ink"
-                    : "text-lc-muted",
-                )}
-              >
-                Director
-              </button>
-              <button
-                type="button"
-                onClick={() => setRole("student")}
-                className={cn(
-                  "cursor-pointer rounded-[8px] px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  role === "student"
-                    ? "bg-lc-surface text-lc-ink"
-                    : "text-lc-muted",
-                )}
-              >
-                Student
-              </button>
-            </div>
-            {role === "student" && students.length > 0 ? (
-              <select
-                value={studentMemberId ?? ""}
-                onChange={(e) => setStudentMemberId(e.target.value)}
-                className="hidden max-w-[160px] rounded-[10px] border border-[var(--lc-line)] bg-lc-bg px-2 py-1.5 text-xs text-lc-ink md:block"
-              >
-                {students.map((s) => (
-                  <option key={s.memberId} value={s.memberId}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={() => void signOutUser()}
+            className="cursor-pointer rounded-[10px] px-3 py-1.5 text-xs font-medium text-lc-muted transition-colors hover:bg-black/[0.04] hover:text-lc-ink"
+          >
+            Sign out
+          </button>
         </div>
       </header>
 
@@ -115,13 +79,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-          <div className="mt-8 rounded-[12px] border border-[var(--lc-line)] bg-lc-surface p-3">
-            <p className="text-xs font-medium text-lc-ink">Demo roles</p>
-            <p className="mt-1 text-xs leading-relaxed text-lc-muted">
-              Switch Director / Student to walk the full internship loop without
-              full auth yet.
-            </p>
-          </div>
         </aside>
 
         <div className="min-w-0 flex-1 px-4 py-6 md:px-0 md:pr-6 md:py-8">

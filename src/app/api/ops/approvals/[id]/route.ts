@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ApprovalStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import { deliverNudge } from "@/server/email/deliver-nudge";
 
 export const runtime = "nodejs";
 
@@ -68,14 +69,23 @@ export async function PATCH(request: Request, { params }: Params) {
       },
     });
 
+    let delivery = null;
+    if (action === "approve") {
+      const result = await deliverNudge({
+        toName: updated.targetName,
+        subject: updated.title,
+        body: updated.body,
+      });
+      delivery = {
+        ...result,
+        at: updated.decidedAt,
+      };
+    }
+
     return NextResponse.json({
       ok: true,
       approval: serialize(updated),
-      // Phase 3: simulate send — no real email provider yet
-      delivery:
-        action === "approve"
-          ? { simulated: true, channel: "console", at: updated.decidedAt }
-          : null,
+      delivery,
     });
   } catch (error) {
     return NextResponse.json(

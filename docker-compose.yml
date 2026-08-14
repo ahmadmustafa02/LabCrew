@@ -4,7 +4,6 @@ services:
     container_name: labcrew-postgres
     restart: unless-stopped
     ports:
-      # Host 5434 avoids clashes with other local Postgres containers
       - "5434:5432"
     environment:
       POSTGRES_USER: labcrew
@@ -23,7 +22,6 @@ services:
     container_name: labcrew-redis
     restart: unless-stopped
     ports:
-      # Host 6380 avoids clashes with other local Redis containers
       - "6380:6379"
     volumes:
       - labcrew_redis_data:/data
@@ -32,6 +30,56 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  migrate:
+    build:
+      context: .
+      target: worker
+    container_name: labcrew-migrate
+    environment:
+      DATABASE_URL: postgresql://labcrew:labcrew@postgres:5432/labcrew?schema=public
+    command: sh -c "npx prisma db push && npx tsx prisma/seed.ts"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      target: web
+    container_name: labcrew-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://labcrew:labcrew@postgres:5432/labcrew?schema=public
+      REDIS_URL: redis://redis:6379
+      AUTH_SECRET: ${AUTH_SECRET:-labcrew-dev-secret-change-me}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-LabCrew <ops@labcrew.local>}
+      NUDGE_TEST_TO: ${NUDGE_TEST_TO:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      target: worker
+    container_name: labcrew-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://labcrew:labcrew@postgres:5432/labcrew?schema=public
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
 volumes:
   labcrew_pg_data:

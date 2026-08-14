@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+storage
+*.md
+.env
+.env.*
+!.env.example
+Dockerfile*
+docker-compose*
+.gitignore
+AGENTS.md
+CLAUDE.md
