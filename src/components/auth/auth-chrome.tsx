@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export function AuthChrome({
   children,
@@ -25,12 +26,15 @@ export function AuthChrome({
         >
           LabCrew
         </Link>
-        <Link
-          href={backHref}
-          className="text-sm text-lc-muted transition-colors hover:text-lc-ink"
-        >
-          ← {backLabel}
-        </Link>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Link
+            href={backHref}
+            className="text-sm text-lc-muted transition-colors hover:text-lc-ink"
+          >
+            ← {backLabel}
+          </Link>
+        </div>
       </header>
       <div className="relative z-10 mx-auto flex w-full max-w-md flex-col px-6 pb-16 pt-10">
         {children}

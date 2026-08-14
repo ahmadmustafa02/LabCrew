@@ -13,29 +13,59 @@ const DIRECTOR_ONLY = [
   "/app/assignments/new",
 ];
 
+const STUDENT_ONLY = ["/app/home"];
+
 function isDirectorOnly(pathname: string) {
   return DIRECTOR_ONLY.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );
 }
 
+function isStudentOnly(pathname: string) {
+  return STUDENT_ONLY.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
+
+type Props = {
+  children: React.ReactNode;
+  /** Optional hard gate for a single page */
+  allow?: "student" | "director";
+};
+
 /** Keeps students out of director-only routes (nav + deep links + role switch). */
-export function RoleGate({ children }: { children: React.ReactNode }) {
+export function RoleGate({ children, allow }: Props) {
   const { role, ready } = useSession();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     if (!ready) return;
-    if (role === "student" && isDirectorOnly(pathname)) {
-      router.replace("/app/assignments");
+    if (allow === "student" && role !== "student") {
+      router.replace("/app/brief");
+      return;
     }
-  }, [ready, role, pathname, router]);
+    if (allow === "director" && role !== "director") {
+      router.replace("/app/home");
+      return;
+    }
+    if (role === "student" && isDirectorOnly(pathname)) {
+      router.replace("/app/home");
+      return;
+    }
+    if (role === "director" && isStudentOnly(pathname)) {
+      router.replace("/app/brief");
+    }
+  }, [ready, role, pathname, router, allow]);
 
-  if (ready && role === "student" && isDirectorOnly(pathname)) {
-    return (
-      <p className="text-sm text-lc-muted">Opening your tasks…</p>
-    );
+  if (
+    ready &&
+    ((allow === "student" && role !== "student") ||
+      (allow === "director" && role !== "director") ||
+      (role === "student" && isDirectorOnly(pathname)) ||
+      (role === "director" && isStudentOnly(pathname)))
+  ) {
+    return <p className="text-sm text-lc-muted">Opening your workspace…</p>;
   }
 
   return children;

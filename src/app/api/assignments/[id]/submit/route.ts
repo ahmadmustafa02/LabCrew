@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma, SubmissionStatus } from "@prisma/client";
+import { Prisma, ReviewStatus, SubmissionStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import {
   assertSameProgram,
@@ -9,6 +9,15 @@ import {
 export const runtime = "nodejs";
 
 type Params = { params: Promise<{ id: string }> };
+
+type Attachment = {
+  id: string;
+  title: string;
+  kind: string;
+  url: string;
+  originalName?: string;
+  size?: number;
+};
 
 export async function GET(_request: Request, { params }: Params) {
   try {
@@ -58,6 +67,7 @@ export async function POST(request: Request, { params }: Params) {
       repoUrl?: string;
       writeup?: string;
       checklist?: string[];
+      attachments?: Attachment[];
       status?: "DRAFT" | "SUBMITTED";
     };
 
@@ -75,13 +85,25 @@ export async function POST(request: Request, { params }: Params) {
     const status =
       body.status === "DRAFT" ? SubmissionStatus.DRAFT : SubmissionStatus.SUBMITTED;
 
+    const attachments = Array.isArray(body.attachments) ? body.attachments : [];
+
     const data = {
       evidenceUrl: body.evidenceUrl?.trim() || null,
       repoUrl: body.repoUrl?.trim() || null,
       writeup: body.writeup?.trim() || null,
       checklist: (body.checklist ?? []) as Prisma.InputJsonValue,
+      attachments: attachments as Prisma.InputJsonValue,
       status,
       submittedAt: status === SubmissionStatus.SUBMITTED ? new Date() : null,
+      reviewStatus:
+        status === SubmissionStatus.SUBMITTED
+          ? ReviewStatus.PENDING_REVIEW
+          : null,
+      // clear prior review when resubmitting
+      reviewComment:
+        status === SubmissionStatus.SUBMITTED ? null : undefined,
+      reviewedAt: status === SubmissionStatus.SUBMITTED ? null : undefined,
+      reviewedById: status === SubmissionStatus.SUBMITTED ? null : undefined,
     };
 
     const submission = await prisma.submission.upsert({
@@ -95,16 +117,23 @@ export async function POST(request: Request, { params }: Params) {
         repoUrl: data.repoUrl,
         writeup: data.writeup,
         checklist: data.checklist,
+        attachments: data.attachments,
         status: data.status,
         submittedAt: data.submittedAt,
+        reviewStatus: data.reviewStatus,
       },
       update: {
         evidenceUrl: data.evidenceUrl,
         repoUrl: data.repoUrl,
         writeup: data.writeup,
         checklist: data.checklist,
+        attachments: data.attachments,
         status: data.status,
         submittedAt: data.submittedAt,
+        reviewStatus: data.reviewStatus,
+        reviewComment: data.reviewComment,
+        reviewedAt: data.reviewedAt,
+        reviewedById: data.reviewedById,
         score: status === SubmissionStatus.SUBMITTED ? Prisma.DbNull : undefined,
       },
     });

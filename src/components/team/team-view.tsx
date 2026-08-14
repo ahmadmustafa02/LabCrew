@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CardListSkeleton } from "@/components/ui/skeleton";
 
 type Invite = {
   id: string;
@@ -21,6 +22,7 @@ export function TeamView() {
   const [email, setEmail] = useState("");
   const [invites, setInvites] = useState<Invite[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -39,11 +41,14 @@ export function TeamView() {
       if (!inv.ok) setError(inv.error ?? "Failed to load invites");
     } catch {
       setError("Could not load team");
+    } finally {
+      setReady(true);
     }
   }
 
   useEffect(() => {
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onInvite(e: FormEvent) {
@@ -121,7 +126,11 @@ export function TeamView() {
         <div className="border-b border-[var(--lc-line)] px-5 py-4">
           <h2 className="text-[15px] font-semibold text-lc-ink">Pending invites</h2>
         </div>
-        {invites.length === 0 ? (
+        {!ready ? (
+          <div className="space-y-2 p-5">
+            <CardListSkeleton count={2} />
+          </div>
+        ) : invites.length === 0 ? (
           <p className="px-5 py-8 text-sm text-lc-muted">No open invites.</p>
         ) : (
           <ul className="divide-y divide-[var(--lc-line)]">
@@ -155,7 +164,11 @@ export function TeamView() {
         <div className="border-b border-[var(--lc-line)] px-5 py-4">
           <h2 className="text-[15px] font-semibold text-lc-ink">Roster</h2>
         </div>
-        {students.length === 0 ? (
+        {!ready ? (
+          <div className="p-5">
+            <CardListSkeleton count={2} />
+          </div>
+        ) : students.length === 0 ? (
           <p className="px-5 py-8 text-sm text-lc-muted">
             No students yet. Send an invite to start the cohort.
           </p>

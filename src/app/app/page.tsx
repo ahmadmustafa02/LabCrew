@@ -10,16 +10,12 @@ export default function AppIndexPage() {
 
   useEffect(() => {
     if (ready) {
-      router.replace(
-        role === "student" ? "/app/assignments" : "/app/brief",
-      );
+      router.replace(role === "student" ? "/app/home" : "/app/brief");
       return;
     }
     // Failsafe: never leave the user on a forever spinner
     const t = window.setTimeout(() => {
-      router.replace(
-        role === "student" ? "/app/assignments" : "/app/brief",
-      );
+      router.replace(role === "student" ? "/app/home" : "/app/brief");
     }, 6000);
     return () => window.clearTimeout(t);
   }, [ready, role, router]);

@@ -88,10 +88,37 @@ export async function PATCH(request: Request, { params }: Params) {
         subject: updated.title,
         body: updated.body,
       });
+
+      const deliveryStatus = result.ok
+        ? result.channel === "smtp"
+          ? "sent"
+          : "console"
+        : "failed";
+
+      const withDelivery = await prisma.approvalItem.update({
+        where: { id },
+        data: {
+          deliveryStatus,
+          deliveryChannel: result.ok ? result.channel : null,
+          deliveryError: result.ok ? null : result.error,
+          deliveredAt: new Date(),
+        },
+      });
+
       delivery = {
-        ...result,
-        at: updated.decidedAt,
+        ok: result.ok,
+        status: deliveryStatus,
+        channel: result.ok ? result.channel : null,
+        error: result.ok ? null : result.error,
+        to: "to" in result ? result.to : undefined,
+        at: withDelivery.deliveredAt,
       };
+
+      return NextResponse.json({
+        ok: true,
+        approval: serialize(withDelivery),
+        delivery,
+      });
     }
 
     return NextResponse.json({
@@ -117,6 +144,10 @@ function serialize(item: {
   targetName: string | null;
   status: ApprovalStatus;
   decidedAt: Date | null;
+  deliveryStatus?: string | null;
+  deliveryChannel?: string | null;
+  deliveryError?: string | null;
+  deliveredAt?: Date | null;
 }) {
   return {
     id: item.id,
@@ -125,5 +156,9 @@ function serialize(item: {
     targetName: item.targetName,
     status: item.status,
     decidedAt: item.decidedAt,
+    deliveryStatus: item.deliveryStatus ?? null,
+    deliveryChannel: item.deliveryChannel ?? null,
+    deliveryError: item.deliveryError ?? null,
+    deliveredAt: item.deliveredAt?.toISOString() ?? null,
   };
 }

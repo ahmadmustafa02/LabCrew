@@ -14,9 +14,24 @@ export async function GET() {
     const prisma = getPrisma();
 
     const items = await prisma.approvalItem.findMany({
-      where: { programId, status: ApprovalStatus.PENDING },
-      orderBy: { createdAt: "desc" },
-      take: 20,
+      where: {
+        programId,
+        OR: [
+          { status: ApprovalStatus.PENDING },
+          {
+            status: {
+              in: [
+                ApprovalStatus.APPROVED,
+                ApprovalStatus.EDITED,
+                ApprovalStatus.REJECTED,
+              ],
+            },
+            decidedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          },
+        ],
+      },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      take: 40,
     });
 
     return NextResponse.json({
@@ -28,6 +43,12 @@ export async function GET() {
         body: item.body,
         targetName: item.targetName,
         kind: item.kind,
+        status: item.status,
+        deliveryStatus: item.deliveryStatus,
+        deliveryChannel: item.deliveryChannel,
+        deliveryError: item.deliveryError,
+        deliveredAt: item.deliveredAt?.toISOString() ?? null,
+        decidedAt: item.decidedAt?.toISOString() ?? null,
       })),
     });
   } catch (error) {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { PageTransition } from "@/components/app/page-transition";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useSession } from "@/components/session/session-provider";
 import { cn } from "@/lib/cn";
 
@@ -17,15 +18,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           { href: "/app/brief", label: "Monday Brief" },
           { href: "/app/mission-control", label: "Mission Control" },
           { href: "/app/assignments", label: "Assignments" },
+          { href: "/app/meetings", label: "Meetings" },
+          { href: "/app/announcements", label: "Announcements" },
+          { href: "/app/messages", label: "Messages" },
           { href: "/app/approvals", label: "Approvals" },
           { href: "/app/analytics", label: "Analytics" },
           { href: "/app/team", label: "Team" },
         ]
-      : [{ href: "/app/assignments", label: "My tasks" }];
+      : [
+          { href: "/app/home", label: "Home" },
+          { href: "/app/assignments", label: "My tasks" },
+          { href: "/app/meetings", label: "Meetings" },
+          { href: "/app/announcements", label: "Announcements" },
+          { href: "/app/messages", label: "Messages" },
+        ];
+
+  function isActive(href: string) {
+    if (href === "/app/assignments") return pathname.startsWith("/app/assignments");
+    if (href === "/app/messages") return pathname.startsWith("/app/messages");
+    if (href === "/app/meetings") return pathname.startsWith("/app/meetings");
+    if (href === "/app/announcements")
+      return pathname.startsWith("/app/announcements");
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
 
   return (
     <div className="min-h-full bg-lc-bg">
-      <header className="sticky top-0 z-20 border-b border-[var(--lc-line)] bg-lc-surface/90 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-[var(--lc-line)] bg-[var(--lc-surface)]/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-3 px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-6">
             <Link href="/app" className="text-[15px] font-semibold tracking-tight">
@@ -42,7 +61,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <AccountMenu />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <AccountMenu />
+          </div>
         </div>
       </header>
 
@@ -50,11 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-52 shrink-0 border-r border-[var(--lc-line)] px-3 py-6 md:block">
           <nav className="space-y-1">
             {nav.map((item) => {
-              const active =
-                item.href === "/app/assignments"
-                  ? pathname.startsWith("/app/assignments")
-                  : pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
@@ -62,8 +80,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "block rounded-[10px] px-3 py-2.5 text-sm transition-colors duration-200",
                     active
-                      ? "bg-black/[0.05] font-medium text-lc-ink"
-                      : "text-lc-muted hover:bg-black/[0.03] hover:text-lc-ink",
+                      ? "bg-[var(--lc-hover-strong)] font-medium text-lc-ink"
+                      : "text-lc-muted hover:bg-[var(--lc-hover)] hover:text-lc-ink",
                   )}
                 >
                   {item.label}
@@ -76,11 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="min-w-0 flex-1 px-4 py-6 md:px-0 md:pr-6 md:py-8">
           <nav className="mb-5 flex gap-1 overflow-x-auto md:hidden">
             {nav.map((item) => {
-              const active =
-                item.href === "/app/assignments"
-                  ? pathname.startsWith("/app/assignments")
-                  : pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
@@ -88,7 +102,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className={cn(
                     "whitespace-nowrap rounded-[10px] px-3 py-2 text-sm transition-colors duration-200",
                     active
-                      ? "bg-black/[0.05] font-medium text-lc-ink"
+                      ? "bg-[var(--lc-hover-strong)] font-medium text-lc-ink"
                       : "text-lc-muted",
                   )}
                 >

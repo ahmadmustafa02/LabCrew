@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CardListSkeleton, PageHeaderSkeleton, Skeleton } from "@/components/ui/skeleton";
+import { SoftReveal } from "@/components/ui/soft-reveal";
 import { cn } from "@/lib/cn";
 
 type Brief = {
@@ -59,28 +61,11 @@ export function MondayBriefView() {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="space-y-6" aria-busy="true">
-        <div className="space-y-2">
-          <div className="h-4 w-28 animate-pulse rounded-md bg-black/[0.06]" />
-          <div className="h-9 w-64 animate-pulse rounded-md bg-black/[0.06]" />
-          <div className="h-4 w-80 max-w-full animate-pulse rounded-md bg-black/[0.04]" />
-        </div>
-        <div className="h-36 animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface" />
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="h-40 animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface" />
-          <div className="h-40 animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!brief) {
+  if (!loading && !brief) {
     return <p className="text-sm text-lc-danger">{error ?? "Brief unavailable"}</p>;
   }
 
-  const when = brief.runFinishedAt
+  const when = brief?.runFinishedAt
     ? new Date(brief.runFinishedAt).toLocaleString(undefined, {
         weekday: "short",
         month: "short",
@@ -91,6 +76,20 @@ export function MondayBriefView() {
     : null;
 
   return (
+    <SoftReveal
+      ready={!loading && Boolean(brief)}
+      skeleton={
+        <div className="space-y-6">
+          <PageHeaderSkeleton titleWidth="w-64" />
+          <Skeleton className="h-36 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface" />
+          <div className="grid gap-3 md:grid-cols-2">
+            <Skeleton className="h-40 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface" />
+            <Skeleton className="h-40 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface" />
+          </div>
+        </div>
+      }
+    >
+      {brief ? (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -106,6 +105,16 @@ export function MondayBriefView() {
           {error ? <p className="mt-2 text-sm text-lc-danger">{error}</p> : null}
         </div>
         <div className="flex flex-wrap gap-2">
+          <a href="/api/ops/brief/export?format=md">
+            <Button variant="secondary" size="md" type="button">
+              Export MD
+            </Button>
+          </a>
+          <a href="/api/ops/brief/export?format=html" target="_blank" rel="noreferrer">
+            <Button variant="secondary" size="md" type="button">
+              Print / PDF
+            </Button>
+          </a>
           <Link href="/app/mission-control">
             <Button variant="secondary" size="md">
               Run weekly ops
@@ -276,5 +285,7 @@ export function MondayBriefView() {
         </>
       )}
     </div>
+      ) : null}
+    </SoftReveal>
   );
 }

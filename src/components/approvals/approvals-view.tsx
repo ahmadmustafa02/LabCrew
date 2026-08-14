@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CardListSkeleton } from "@/components/ui/skeleton";
+import { SoftReveal } from "@/components/ui/soft-reveal";
 import { cn } from "@/lib/cn";
 
 type Approval = {
@@ -11,6 +13,10 @@ type Approval = {
   body: string;
   targetName: string | null;
   status?: string;
+  deliveryStatus?: string | null;
+  deliveryChannel?: string | null;
+  deliveryError?: string | null;
+  deliveredAt?: string | null;
 };
 
 const FALLBACK: Approval[] = [
@@ -100,14 +106,50 @@ export function ApprovalsView() {
         );
         setEditingId(null);
         showToast("Draft saved");
-      } else {
-        setApprovals((prev) => prev.filter((item) => item.id !== id));
-        setEditingId(null);
-        showToast(
-          action === "approve"
-            ? "Approved - nudge marked sent (simulated)"
-            : "Rejected - draft dismissed",
+      } else if (action === "approve") {
+        const d = data.delivery as
+          | {
+              ok?: boolean;
+              status?: string;
+              channel?: string | null;
+              error?: string | null;
+              to?: string;
+            }
+          | null
+          | undefined;
+        setApprovals((prev) =>
+          prev.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  status: data.approval.status,
+                  body: data.approval.body,
+                  deliveryStatus: d?.status ?? data.approval.deliveryStatus,
+                  deliveryChannel: d?.channel ?? data.approval.deliveryChannel,
+                  deliveryError: d?.error ?? data.approval.deliveryError,
+                  deliveredAt: data.approval.deliveredAt,
+                }
+              : item,
+          ),
         );
+        setEditingId(null);
+        if (d?.status === "sent") {
+          showToast(`Emailed${d.to ? ` ${d.to}` : ""} via SMTP`);
+        } else if (d?.status === "console") {
+          showToast("Logged to console (no SMTP / SMTP failed over)");
+        } else if (d?.status === "failed") {
+          showToast(d.error ?? "Delivery failed");
+        } else {
+          showToast("Approved");
+        }
+      } else {
+        setApprovals((prev) =>
+          prev.map((item) =>
+            item.id === id ? { ...item, status: "REJECTED" } : item,
+          ),
+        );
+        setEditingId(null);
+        showToast("Rejected — draft dismissed");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
@@ -143,16 +185,11 @@ export function ApprovalsView() {
         ) : null}
       </div>
 
-      {source === "loading" ? (
-        <div className="space-y-3" aria-busy="true">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-[120px] animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface"
-            />
-          ))}
-        </div>
-      ) : approvals.length === 0 ? (
+      <SoftReveal
+        ready={source !== "loading"}
+        skeleton={<CardListSkeleton count={3} />}
+      >
+      {approvals.length === 0 ? (
         <div className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-10 text-sm text-lc-muted">
           No pending drafts. Run weekly ops from Mission Control when the cohort
           needs attention.
@@ -162,17 +199,51 @@ export function ApprovalsView() {
           {approvals.map((draft) => {
             const editing = editingId === draft.id;
             const busy = busyId === draft.id;
+            const pending =
+              !draft.status || draft.status === "PENDING" || draft.id.startsWith("demo-");
+            const deliveryLabel =
+              draft.deliveryStatus === "sent"
+                ? `Sent via ${draft.deliveryChannel ?? "SMTP"}`
+                : draft.deliveryStatus === "console"
+                  ? "Logged to console"
+                  : draft.deliveryStatus === "failed"
+                    ? `Delivery failed${draft.deliveryError ? `: ${draft.deliveryError}` : ""}`
+                    : draft.status === "REJECTED"
+                      ? "Rejected"
+                      : null;
             return (
               <article
                 key={draft.id}
-                className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5 transition-[opacity,transform] duration-200"
+                className={cn(
+                  "rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5",
+                  !pending && "opacity-80",
+                )}
               >
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="max-w-2xl flex-1">
-                      <p className="text-sm font-semibold text-lc-ink">
-                        {draft.targetName ?? draft.title}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-lc-ink">
+                          {draft.targetName ?? draft.title}
+                        </p>
+                        {deliveryLabel ? (
+                          <span
+                            className={cn(
+                              "rounded-md px-2 py-0.5 text-[11px] font-medium",
+                              draft.deliveryStatus === "sent" &&
+                                "bg-[var(--lc-success-soft)] text-lc-success",
+                              draft.deliveryStatus === "console" &&
+                                "bg-[var(--lc-warn-soft)] text-lc-warn",
+                              draft.deliveryStatus === "failed" &&
+                                "bg-[var(--lc-danger-soft)] text-lc-danger",
+                              draft.status === "REJECTED" &&
+                                "bg-black/[0.04] text-lc-muted",
+                            )}
+                          >
+                            {deliveryLabel}
+                          </span>
+                        ) : null}
+                      </div>
                       {editing ? (
                         <textarea
                           value={draftBody}
@@ -187,7 +258,8 @@ export function ApprovalsView() {
                       )}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
-                      {editing ? (
+                      {pending ? (
+                        editing ? (
                         <>
                           <Button
                             variant="secondary"
@@ -247,7 +319,8 @@ export function ApprovalsView() {
                             Approve
                           </Button>
                         </>
-                      )}
+                      )
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -256,6 +329,7 @@ export function ApprovalsView() {
           })}
         </div>
       )}
+      </SoftReveal>
 
       <Link href="/app/brief">
         <Button variant="ghost" size="sm">

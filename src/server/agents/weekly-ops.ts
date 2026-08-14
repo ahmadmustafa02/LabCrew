@@ -9,23 +9,10 @@ import {
   SubmissionStatus,
 } from "@prisma/client";
 import { getPrisma } from "../../lib/db";
+import { draftNudge, scoreSubmission } from "./llm-scoring";
+import { llmConfigured } from "../llm/client";
 
 const STEP_PAUSE_MS = 450;
-
-function isHttpUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function looksLikeWriteup(text: string) {
-  const lower = text.toLowerCase();
-  const signals = ["method", "result", "next", "finding", "approach", "demo"];
-  return signals.some((s) => lower.includes(s)) || text.split(/\s+/).length >= 25;
-}
 
 type StepDef = {
   agent: AgentName;
@@ -126,11 +113,8 @@ export async function executeWeeklyOps(runId: string) {
           requireWriteup?: boolean;
           requireRepoUrl?: boolean;
           minWriteupLength?: number;
+          checklist?: string[];
         };
-        const requireEvidence = rubric.requireEvidenceUrl !== false;
-        const requireWriteup = rubric.requireWriteup !== false;
-        const requireRepo = Boolean(rubric.requireRepoUrl);
-        const minWriteup = rubric.minWriteupLength ?? 40;
 
         const students = await prisma.member.findMany({
           where: { programId, role: MemberRole.STUDENT },
@@ -144,6 +128,7 @@ export async function executeWeeklyOps(runId: string) {
         let complete = 0;
         let weak = 0;
         let missing = 0;
+        let llmUsed = 0;
         const exceptions: {
           name: string;
           email: string;
@@ -167,34 +152,18 @@ export async function executeWeeklyOps(runId: string) {
             continue;
           }
 
-          const writeup = (row.writeup ?? "").trim();
-          const evidenceUrl = (row.evidenceUrl ?? "").trim();
-          const repoUrl = (row.repoUrl ?? "").trim();
-          const hasEvidence = Boolean(evidenceUrl);
-          const hasRepo = Boolean(repoUrl);
-          const problems: string[] = [];
+          const scored = await scoreSubmission({
+            studentName: name,
+            milestoneTitle: activeMilestone.title,
+            instructions: activeMilestone.instructions,
+            writeup: (row.writeup ?? "").trim(),
+            evidenceUrl: (row.evidenceUrl ?? "").trim(),
+            repoUrl: (row.repoUrl ?? "").trim(),
+            rubric,
+          });
+          if (scored.source === "llm") llmUsed += 1;
 
-          if (requireEvidence && !hasEvidence) {
-            problems.push("Demo/evidence link missing");
-          } else if (requireEvidence && hasEvidence && !isHttpUrl(evidenceUrl)) {
-            problems.push("Evidence URL is not a valid http(s) link");
-          }
-          if (requireRepo && !hasRepo) {
-            problems.push("GitHub repo missing");
-          } else if (requireRepo && hasRepo && !isHttpUrl(repoUrl)) {
-            problems.push("Repo URL is not a valid http(s) link");
-          }
-          if (requireWriteup && writeup.length < minWriteup) {
-            problems.push("Writeup too thin vs rubric");
-          } else if (
-            requireWriteup &&
-            writeup.length >= minWriteup &&
-            !looksLikeWriteup(writeup)
-          ) {
-            problems.push("Writeup lacks methods/results signal");
-          }
-
-          if (problems.length === 0) {
+          if (scored.complete) {
             complete += 1;
             await prisma.submission.update({
               where: { id: row.id },
@@ -202,31 +171,47 @@ export async function executeWeeklyOps(runId: string) {
                 status: SubmissionStatus.SCORED,
                 score: {
                   complete: true,
-                  notes: `Meets rubric for ${activeMilestone.title}`,
+                  notes: scored.notes,
+                  source: scored.source,
                 },
               },
             });
           } else {
             weak += 1;
+            const reason = scored.reason ?? scored.notes;
             exceptions.push({
               name,
               email,
-              reason: problems[0],
-              severity: problems[0].includes("missing") ? "high" : "medium",
+              reason,
+              severity: scored.severity ?? "medium",
             });
             await prisma.submission.update({
               where: { id: row.id },
               data: {
                 status: SubmissionStatus.SCORED,
-                score: { complete: false, notes: problems.join("; ") },
+                score: {
+                  complete: false,
+                  notes: scored.notes,
+                  source: scored.source,
+                },
               },
             });
           }
         }
 
+        const mode = llmConfigured()
+          ? `LLM scoring (${llmUsed} AI reviews)`
+          : "heuristic scoring";
         return {
-          detail: `${complete} complete | ${weak} weak | ${missing} missing`,
-          payload: { complete, weak, missing, exceptions },
+          detail: `${complete} complete | ${weak} weak | ${missing} missing · ${mode}`,
+          payload: {
+            complete,
+            weak,
+            missing,
+            exceptions,
+            scoringMode: llmConfigured() ? "llm" : "heuristic",
+            llmUsed,
+          },
         };
       },
     },
@@ -248,15 +233,24 @@ export async function executeWeeklyOps(runId: string) {
         };
         const exceptions = payload.exceptions ?? [];
 
+        const activeMilestone = await prisma.milestone.findFirst({
+          where: { programId, status: MilestoneStatus.ACTIVE },
+        });
+        const milestoneTitle = activeMilestone?.title ?? "this milestone";
+
         await prisma.approvalItem.deleteMany({
           where: { programId, status: ApprovalStatus.PENDING, kind: "nudge" },
         });
 
+        let llmDrafts = 0;
         for (const item of exceptions) {
-          const body =
-            item.severity === "high"
-              ? `Hi ${item.name.split(" ")[0]} — ${item.reason}. The smallest next step is a short status note today, even if the demo isn’t perfect.`
-              : `Hi ${item.name.split(" ")[0]} — ${item.reason}. A tight 5-bullet update against the Week 4 rubric will unblock review.`;
+          const drafted = await draftNudge({
+            studentName: item.name,
+            reason: item.reason,
+            severity: item.severity,
+            milestoneTitle,
+          });
+          if (drafted.source === "llm") llmDrafts += 1;
 
           await prisma.approvalItem.create({
             data: {
@@ -264,7 +258,7 @@ export async function executeWeeklyOps(runId: string) {
               runId,
               kind: "nudge",
               title: `Nudge - ${item.name}`,
-              body,
+              body: drafted.body,
               targetName: item.name,
               targetEmail: item.email ?? null,
               status: ApprovalStatus.PENDING,
@@ -272,9 +266,16 @@ export async function executeWeeklyOps(runId: string) {
           });
         }
 
+        const mode = llmConfigured()
+          ? `${llmDrafts}/${exceptions.length} LLM drafts`
+          : "template drafts";
         return {
-          detail: `${exceptions.length} high-priority drafts ready for approval`,
-          payload: { draftCount: exceptions.length },
+          detail: `${exceptions.length} drafts ready for approval · ${mode}`,
+          payload: {
+            draftCount: exceptions.length,
+            coachMode: llmConfigured() ? "llm" : "heuristic",
+            llmDrafts,
+          },
         };
       },
     },

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SoftReveal } from "@/components/ui/soft-reveal";
+import { StatRowSkeleton } from "@/components/ui/skeleton";
 
 type Analytics = {
   programName: string;
@@ -88,18 +90,21 @@ export function AnalyticsView() {
         ) : null}
       </div>
 
+      <SoftReveal
+        ready={!loading && Boolean(cards)}
+        skeleton={
+          <div className="space-y-6">
+            <StatRowSkeleton count={4} />
+            <div className="h-48 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface lc-skel" />
+          </div>
+        }
+      >
+      <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-2">
-        {loading || !cards
-          ? [0, 1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-[120px] animate-pulse rounded-[16px] border border-[var(--lc-line)] bg-lc-surface"
-              />
-            ))
-          : cards.map((row) => (
+        {(cards ?? []).map((row) => (
               <div
                 key={row.label}
-                className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5 transition-colors duration-200"
+                className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5"
               >
                 <p className="text-xs text-lc-muted">{row.label}</p>
                 <p className="mt-2 text-3xl font-semibold tracking-tight text-lc-ink">
@@ -145,6 +150,8 @@ export function AnalyticsView() {
           </ul>
         )}
       </section>
+      </div>
+      </SoftReveal>
     </div>
   );
 }

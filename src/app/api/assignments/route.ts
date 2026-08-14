@@ -19,27 +19,62 @@ export async function GET() {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
         submissions: {
-          where: { status: { in: ["SUBMITTED", "SCORED"] } },
-          select: { id: true },
+          select: {
+            id: true,
+            status: true,
+            reviewStatus: true,
+            memberId: true,
+          },
+        },
+        program: {
+          include: {
+            members: {
+              where: { role: "STUDENT" },
+              select: { id: true },
+            },
+          },
         },
       },
     });
 
+    const isStudent = gate.session.appRole === "student";
+    const myId = membership.id;
+
     return NextResponse.json({
       ok: true,
       programId: membership.programId,
-      assignments: assignments.map((a) => ({
-        id: a.id,
-        title: a.title,
-        description: a.description,
-        instructions: a.instructions,
-        materials: a.materials,
-        rubric: a.rubric,
-        dueAt: a.dueAt,
-        status: a.status,
-        sortOrder: a.sortOrder,
-        submissionCount: a.submissions.length,
-      })),
+      assignments: assignments.map((a) => {
+        const turnedIn = a.submissions.filter((s) =>
+          ["SUBMITTED", "SCORED"].includes(s.status),
+        );
+        const mySub = a.submissions.find((s) => s.memberId === myId);
+        return {
+          id: a.id,
+          title: a.title,
+          description: a.description,
+          instructions: a.instructions,
+          materials: a.materials,
+          rubric: a.rubric,
+          dueAt: a.dueAt,
+          status: a.status,
+          sortOrder: a.sortOrder,
+          materialCount: Array.isArray(a.materials) ? a.materials.length : 0,
+          studentCount: a.program.members.length,
+          submissionCount: turnedIn.length,
+          pendingReview: turnedIn.filter(
+            (s) => s.reviewStatus === "PENDING_REVIEW",
+          ).length,
+          needsRevision: turnedIn.filter(
+            (s) => s.reviewStatus === "NEEDS_REVISION",
+          ).length,
+          approved: turnedIn.filter(
+            (s) =>
+              s.reviewStatus === "APPROVED" || s.reviewStatus === "DONE",
+          ).length,
+          myStatus: isStudent ? (mySub?.status ?? null) : null,
+          myReviewStatus: isStudent ? (mySub?.reviewStatus ?? null) : null,
+        };
+      }),
     });
   } catch (error) {
     return NextResponse.json(

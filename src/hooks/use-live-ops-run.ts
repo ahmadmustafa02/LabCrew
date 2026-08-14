@@ -44,7 +44,10 @@ function normalizeStatus(status: string): StepStatus {
   return "pending";
 }
 
-function durationHint(startedAt?: string | Date | null, finishedAt?: string | Date | null) {
+function durationHint(
+  startedAt?: string | Date | null,
+  finishedAt?: string | Date | null,
+) {
   if (!startedAt || !finishedAt) return "—";
   const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
   if (!Number.isFinite(ms) || ms < 0) return "—";
@@ -52,28 +55,34 @@ function durationHint(startedAt?: string | Date | null, finishedAt?: string | Da
   return `${sec}s`;
 }
 
+const IDLE_STEPS: MockStep[] = MOCK_RUN.steps.map((s) => ({
+  ...s,
+  status: "pending" as const,
+  detail: "Waiting for weekly ops…",
+}));
+
 export function useLiveOpsRun() {
   const demo = useOpsRunReplay();
-  const [mode, setMode] = useState<LiveMode>("demo");
+  /** null until first bootstrap finishes — UI must not paint demo then live */
+  const [mode, setMode] = useState<LiveMode | null>(null);
   const [programId, setProgramId] = useState<string | null>(null);
-  const [programLabel, setProgramLabel] = useState(MOCK_RUN.label);
+  const [programLabel, setProgramLabel] = useState("");
   const [liveBusy, setLiveBusy] = useState(false);
-  const [liveRunId, setLiveRunId] = useState(MOCK_RUN.id);
+  const [liveRunId, setLiveRunId] = useState("—");
   const [liveBadge, setLiveBadge] = useState<"idle" | "running" | "succeeded">(
     "idle",
   );
-  const [liveSteps, setLiveSteps] = useState<MockStep[]>(
-    MOCK_RUN.steps.map((s) => ({ ...s, status: "pending" as const })),
-  );
-  const [liveExceptions, setLiveExceptions] =
-    useState<LiveException[]>(MOCK_EXCEPTIONS);
+  const [liveSteps, setLiveSteps] = useState<MockStep[]>(IDLE_STEPS);
+  const [liveExceptions, setLiveExceptions] = useState<LiveException[]>([]);
   const [showExceptions, setShowExceptions] = useState(false);
   const [briefing, setBriefing] = useState<string | null>(null);
   const [stats, setStats] = useState<RunStats | null>(null);
   const [lastRunDuration, setLastRunDuration] = useState("—");
-  const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasRun, setHasRun] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  const ready = mode !== null;
 
   const stopPoll = useCallback(() => {
     if (pollRef.current != null) {
@@ -102,6 +111,7 @@ export function useLiveOpsRun() {
       startedAt?: string | Date | null;
       finishedAt?: string | Date | null;
     }) => {
+      setHasRun(true);
       setLiveRunId(run.id);
       const status = run.status.toUpperCase();
       if (status === "RUNNING" || status === "QUEUED") {
@@ -130,10 +140,10 @@ export function useLiveOpsRun() {
               status: normalizeStatus(step.status),
               at: `21:04:${String(index * 8).padStart(2, "0")}`,
             }))
-          : MOCK_RUN.steps.map((s) => ({ ...s, status: "pending" as const }));
+          : IDLE_STEPS;
 
       setLiveSteps(steps);
-      if (run.exceptions.length) setLiveExceptions(run.exceptions);
+      setLiveExceptions(run.exceptions);
       if (run.briefing) setBriefing(run.briefing);
       if (run.stats) setStats(run.stats);
     },
@@ -162,14 +172,15 @@ export function useLiveOpsRun() {
       try {
         const res = await fetch("/api/demo/program");
         const data = await res.json();
-        if (cancelled || !data.ok) {
-          if (!cancelled) setHydrated(true);
+        if (cancelled) return;
+
+        if (!data.ok) {
+          setMode("demo");
           return;
         }
 
         setProgramId(data.program.id);
         setProgramLabel(data.program.name);
-        setMode("live");
 
         const latestRes = await fetch(
           `/api/ops/runs?latest=1&programId=${encodeURIComponent(data.program.id)}`,
@@ -184,10 +195,10 @@ export function useLiveOpsRun() {
             pollRun(latest.run.id);
           }
         }
+
+        setMode("live");
       } catch {
-        // keep demo mode
-      } finally {
-        if (!cancelled) setHydrated(true);
+        if (!cancelled) setMode("demo");
       }
     })();
     return () => {
@@ -207,7 +218,9 @@ export function useLiveOpsRun() {
       setLiveBusy(true);
       setLiveBadge("running");
       setShowExceptions(false);
-      setLiveSteps(MOCK_RUN.steps.map((s) => ({ ...s, status: "pending" })));
+      setLiveExceptions([]);
+      setLiveSteps(IDLE_STEPS);
+      setHasRun(true);
 
       const res = await fetch("/api/ops/runs", {
         method: "POST",
@@ -229,42 +242,54 @@ export function useLiveOpsRun() {
     }
   }, [demo, mode, pollRun, programId]);
 
-  const displayStats = stats ?? {
-    onTrack: 0,
-    students: 0,
-    exceptions: 0,
-    draftNudges: 0,
-  };
-
-  const statCards = [
+  const liveStatCards = [
     {
       label: "On track",
-      value: hydrated && stats ? String(displayStats.onTrack) : "—",
+      value: stats ? String(stats.onTrack) : hasRun ? "0" : "—",
       hint: stats
-        ? `of ${displayStats.students || 12} students`
-        : hydrated
-          ? "run weekly ops"
-          : "loading…",
+        ? `of ${stats.students} students`
+        : hasRun
+          ? "from last run"
+          : "run weekly ops",
     },
     {
       label: "Exceptions",
-      value: hydrated && stats ? String(displayStats.exceptions) : "—",
+      value: stats ? String(stats.exceptions) : hasRun ? "0" : "—",
       hint: "need a decision",
     },
     {
       label: "Draft nudges",
-      value: hydrated && stats ? String(displayStats.draftNudges) : "—",
+      value: stats ? String(stats.draftNudges) : hasRun ? "0" : "—",
       hint: "awaiting approval",
     },
     {
       label: "Last run",
-      value: hydrated ? lastRunDuration : "—",
+      value: hasRun ? lastRunDuration : "—",
       hint: "weekly ops",
     },
   ];
 
+  if (!ready) {
+    return {
+      ready: false as const,
+      mode: null,
+      programLabel: "",
+      steps: IDLE_STEPS,
+      badge: "idle" as const,
+      busy: false,
+      runId: "—",
+      showExceptions: false,
+      exceptions: [] as LiveException[],
+      briefing: null as string | null,
+      error: null as string | null,
+      statCards: [] as typeof liveStatCards,
+      start,
+    };
+  }
+
   if (mode === "live") {
     return {
+      ready: true as const,
       mode,
       programLabel,
       steps: liveSteps,
@@ -275,14 +300,15 @@ export function useLiveOpsRun() {
       exceptions: liveExceptions,
       briefing,
       error,
-      statCards,
+      statCards: liveStatCards,
       start,
     };
   }
 
   return {
+    ready: true as const,
     mode,
-    programLabel,
+    programLabel: "Demo lab",
     steps: demo.steps,
     badge: demo.badge,
     busy: demo.busy,

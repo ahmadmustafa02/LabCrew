@@ -2,9 +2,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
+/** Bump when Prisma schema fields change so HMR drops a stale client. */
+const PRISMA_SCHEMA_REV = 3;
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   pgPool: Pool | undefined;
+  prismaSchemaRev: number | undefined;
 };
 
 function createPrismaClient() {
@@ -39,17 +43,38 @@ export function getPrisma() {
     | undefined;
 
   // After `prisma generate` / schema changes, Next HMR can keep a stale client
-  // without new model delegates (invite, passwordResetToken, storedFile, …).
+  // without new model delegates. Force a fresh client when any are missing.
+  const required = [
+    "passwordResetToken",
+    "invite",
+    "storedFile",
+    "meeting",
+    "message",
+    "conversation",
+    "notification",
+    "announcement",
+    "announcementRecipient",
+    "programOpsSchedule",
+  ] as const;
+
   const stale =
     existing != null &&
-    (typeof existing.passwordResetToken === "undefined" ||
-      typeof existing.invite === "undefined" ||
-      typeof existing.storedFile === "undefined");
+    (globalForPrisma.prismaSchemaRev !== PRISMA_SCHEMA_REV ||
+      required.some((key) => typeof existing[key] === "undefined"));
 
   if (!existing || stale) {
-    if (stale) {
+    if (stale && existing) {
       void existing.$disconnect().catch(() => undefined);
+      globalForPrisma.prisma = undefined;
     }
+    globalForPrisma.prisma = createPrismaClient();
+    globalForPrisma.prismaSchemaRev = PRISMA_SCHEMA_REV;
+  }
+
+  const client = globalForPrisma.prisma!;
+  // Last-resort: if still missing (rare HMR race), rebuild once more.
+  if (typeof (client as PrismaClient & Record<string, unknown>).announcement === "undefined") {
+    void client.$disconnect().catch(() => undefined);
     globalForPrisma.prisma = createPrismaClient();
   }
 

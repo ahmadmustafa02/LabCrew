@@ -7,6 +7,7 @@ export type WeeklyOpsJob = {
   programId: string;
   runId: string;
   trigger?: "manual" | "schedule";
+  kind?: "schedule-tick";
 };
 
 let opsQueue: Queue<WeeklyOpsJob> | null = null;

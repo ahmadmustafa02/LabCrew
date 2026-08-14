@@ -28,6 +28,14 @@ enum SubmissionStatus {
   SCORED
 }
 
+/// Professor review workflow (ClickUp-style)
+enum ReviewStatus {
+  PENDING_REVIEW
+  NEEDS_REVISION
+  APPROVED
+  DONE
+}
+
 enum AgentName {
   DISPATCHER
   PULSE
@@ -83,6 +91,11 @@ model Program {
   approvals      ApprovalItem[]
   invites        Invite[]
   files          StoredFile[]
+  meetings       Meeting[]
+  conversations  Conversation[]
+  notifications  Notification[]
+  announcements  Announcement[]
+  opsSchedule    ProgramOpsSchedule?
 }
 
 model User {
@@ -120,6 +133,13 @@ model Member {
   role           MemberRole
   createdAt      DateTime     @default(now())
   submissions    Submission[]
+  meetingInvites MeetingInvite[]
+  createdMeetings Meeting[]   @relation("MeetingCreator")
+  studentThreads Conversation[] @relation("StudentThread")
+  sentMessages   Message[]
+  notifications  Notification[]
+  createdAnnouncements Announcement[] @relation("AnnouncementCreator")
+  announcementRecipients AnnouncementRecipient[]
 
   @@unique([programId, userId])
   @@index([organizationId])
@@ -158,13 +178,21 @@ model Submission {
   repoUrl     String?
   writeup     String?
   checklist   Json?
+  /// [{ id, title, kind, url, originalName?, size? }]
+  attachments Json?
   score       Json?
+  /// Professor review status (null while still draft)
+  reviewStatus  ReviewStatus?
+  reviewComment String?
+  reviewedAt    DateTime?
+  reviewedById  String?
   submittedAt DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   @@unique([milestoneId, memberId])
   @@index([memberId])
+  @@index([reviewStatus])
 }
 
 model AgentRun {
@@ -216,6 +244,12 @@ model ApprovalItem {
   status      ApprovalStatus @default(PENDING)
   createdAt   DateTime       @default(now())
   decidedAt   DateTime?
+  /// sent | console | failed | skipped
+  deliveryStatus  String?
+  /// smtp | console
+  deliveryChannel String?
+  deliveryError   String?
+  deliveredAt     DateTime?
 
   @@index([programId, status])
 }
@@ -250,4 +284,144 @@ model StoredFile {
   createdAt    DateTime @default(now())
 
   @@index([programId])
+}
+
+enum MeetingAudience {
+  ALL
+  SELECTED
+}
+
+enum RsvpStatus {
+  YES
+  NO
+  MAYBE
+}
+
+/// Director-created lab meeting (Zoom/Meet link + agenda).
+model Meeting {
+  id          String          @id @default(cuid())
+  programId   String
+  program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   Member          @relation("MeetingCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  title       String
+  agenda      String?
+  meetingUrl  String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  audience    MeetingAudience @default(ALL)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  invites     MeetingInvite[]
+
+  @@index([programId, startsAt])
+}
+
+model MeetingInvite {
+  id         String      @id @default(cuid())
+  meetingId  String
+  meeting    Meeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  memberId   String
+  member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  notifiedAt DateTime?
+  readAt     DateTime?
+  rsvp       RsvpStatus?
+  createdAt  DateTime    @default(now())
+
+  @@unique([meetingId, memberId])
+  @@index([memberId])
+}
+
+/// One thread per student in a program (student ↔ directors).
+model Conversation {
+  id              String    @id @default(cuid())
+  programId       String
+  program         Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  studentMemberId String
+  student         Member    @relation("StudentThread", fields: [studentMemberId], references: [id], onDelete: Cascade)
+  lastMessageAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  messages        Message[]
+
+  @@unique([programId, studentMemberId])
+  @@index([programId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderMemberId String
+  sender         Member       @relation(fields: [senderMemberId], references: [id], onDelete: Cascade)
+  body           String
+  createdAt      DateTime     @default(now())
+  /// Client optimistic id for smooth UI reconciliation
+  clientId       String?
+
+  @@index([conversationId, createdAt])
+  @@index([senderMemberId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  programId String
+  program   Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  kind      String
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([memberId, createdAt])
+  @@index([memberId, readAt])
+}
+
+/// Director broadcast (deadline moves, reminders, etc.)
+model Announcement {
+  id          String          @id @default(cuid())
+  programId   String
+  program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   Member          @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  audience    MeetingAudience @default(ALL)
+  createdAt   DateTime        @default(now())
+  recipients  AnnouncementRecipient[]
+
+  @@index([programId, createdAt])
+}
+
+model AnnouncementRecipient {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  notifiedAt     DateTime?
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@unique([announcementId, memberId])
+  @@index([memberId])
+}
+
+/// Auto weekly ops schedule (checked by worker tick).
+model ProgramOpsSchedule {
+  id             String    @id @default(cuid())
+  programId      String    @unique
+  program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  enabled        Boolean   @default(false)
+  /// 0 = Sunday … 6 = Saturday
+  dayOfWeek      Int       @default(0)
+  /// Local hour 0–23 in `timezone`
+  hourLocal      Int       @default(20)
+  timezone       String    @default("Asia/Karachi")
+  lastEnqueuedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }

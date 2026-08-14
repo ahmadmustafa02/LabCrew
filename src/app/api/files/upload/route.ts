@@ -2,15 +2,16 @@ import { randomUUID } from "crypto";
 import path from "path";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
-import { requireDirector } from "@/server/auth/api-session";
+import { requireAuth } from "@/server/auth/api-session";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = 8 * 1024 * 1024;
+const MAX_BYTES = 12 * 1024 * 1024;
 
+/** Any authenticated member can upload (materials for directors, attachments for students). */
 export async function POST(request: Request) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireAuth();
     if ("error" in gate) return gate.error;
 
     const form = await request.formData();
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     }
     if (file.size > MAX_BYTES) {
       return NextResponse.json(
-        { ok: false, error: "File too large (max 8MB)" },
+        { ok: false, error: "File too large (max 12MB)" },
         { status: 400 },
       );
     }
@@ -49,6 +50,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      file: {
+        id,
+        title: title || file.name,
+        kind: "file" as const,
+        url: `/api/files/${filename}`,
+        originalName: file.name,
+        size: file.size,
+      },
+      // backwards-compatible for assignment material uploads
       material: {
         id,
         title: title || file.name,
