@@ -9,10 +9,17 @@ export default function AppIndexPage() {
   const { role, ready } = useSession();
 
   useEffect(() => {
-    if (!ready) return;
-    router.replace(
-      role === "student" ? "/app/assignments" : "/app/mission-control",
-    );
+    if (ready) {
+      router.replace(
+        role === "student" ? "/app/assignments" : "/app/mission-control",
+      );
+      return;
+    }
+    // Failsafe: never leave the user on a forever spinner
+    const t = window.setTimeout(() => {
+      router.replace("/app/mission-control");
+    }, 6000);
+    return () => window.clearTimeout(t);
   }, [ready, role, router]);
 
   return (

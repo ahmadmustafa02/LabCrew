@@ -38,8 +38,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 5000);
     try {
-      const res = await fetch("/api/demo/members");
+      const res = await fetch("/api/demo/members", { signal: controller.signal });
       const data = await res.json();
       if (!data.ok) return;
       setProgramName(data.program.name);
@@ -53,8 +55,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         window.localStorage.setItem(STUDENT_MEMBER_STORAGE_KEY, valid.memberId);
       }
     } catch {
-      // offline / unseeded
+      // offline / unseeded / slow DB — still unlock UI
     } finally {
+      window.clearTimeout(timer);
       setReady(true);
     }
   }, []);
