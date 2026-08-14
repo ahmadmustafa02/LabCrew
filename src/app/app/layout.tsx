@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app/app-shell";
+import { RoleGate } from "@/components/app/role-gate";
 import { SessionProvider } from "@/components/session/session-provider";
 
 export default function DashboardLayout({
@@ -8,7 +9,9 @@ export default function DashboardLayout({
 }) {
   return (
     <SessionProvider>
-      <AppShell>{children}</AppShell>
+      <AppShell>
+        <RoleGate>{children}</RoleGate>
+      </AppShell>
     </SessionProvider>
   );
 }

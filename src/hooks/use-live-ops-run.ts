@@ -44,12 +44,13 @@ function normalizeStatus(status: string): StepStatus {
   return "pending";
 }
 
-const DEFAULT_STATS: RunStats = {
-  onTrack: 9,
-  students: 12,
-  exceptions: 3,
-  draftNudges: 3,
-};
+function durationHint(startedAt?: string | Date | null, finishedAt?: string | Date | null) {
+  if (!startedAt || !finishedAt) return "—";
+  const ms = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "—";
+  const sec = Math.max(1, Math.round(ms / 1000));
+  return `${sec}s`;
+}
 
 export function useLiveOpsRun() {
   const demo = useOpsRunReplay();
@@ -59,14 +60,18 @@ export function useLiveOpsRun() {
   const [liveBusy, setLiveBusy] = useState(false);
   const [liveRunId, setLiveRunId] = useState(MOCK_RUN.id);
   const [liveBadge, setLiveBadge] = useState<"idle" | "running" | "succeeded">(
-    "succeeded",
+    "idle",
   );
-  const [liveSteps, setLiveSteps] = useState<MockStep[]>(MOCK_RUN.steps);
+  const [liveSteps, setLiveSteps] = useState<MockStep[]>(
+    MOCK_RUN.steps.map((s) => ({ ...s, status: "pending" as const })),
+  );
   const [liveExceptions, setLiveExceptions] =
     useState<LiveException[]>(MOCK_EXCEPTIONS);
-  const [showExceptions, setShowExceptions] = useState(true);
+  const [showExceptions, setShowExceptions] = useState(false);
   const [briefing, setBriefing] = useState<string | null>(null);
-  const [stats, setStats] = useState<RunStats>(DEFAULT_STATS);
+  const [stats, setStats] = useState<RunStats | null>(null);
+  const [lastRunDuration, setLastRunDuration] = useState("—");
+  const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
@@ -78,26 +83,6 @@ export function useLiveOpsRun() {
   }, []);
 
   useEffect(() => () => stopPoll(), [stopPoll]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/demo/program");
-        const data = await res.json();
-        if (!cancelled && data.ok) {
-          setProgramId(data.program.id);
-          setProgramLabel(data.program.name);
-          setMode("live");
-        }
-      } catch {
-        // keep demo mode
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const applyLivePayload = useCallback(
     (run: {
@@ -114,6 +99,8 @@ export function useLiveOpsRun() {
       exceptions: LiveException[];
       briefing: string | null;
       stats?: RunStats;
+      startedAt?: string | Date | null;
+      finishedAt?: string | Date | null;
     }) => {
       setLiveRunId(run.id);
       const status = run.status.toUpperCase();
@@ -125,6 +112,7 @@ export function useLiveOpsRun() {
         setLiveBadge("succeeded");
         setLiveBusy(false);
         setShowExceptions(true);
+        setLastRunDuration(durationHint(run.startedAt, run.finishedAt));
         stopPoll();
       } else if (status === "FAILED") {
         setLiveBadge("idle");
@@ -168,6 +156,45 @@ export function useLiveOpsRun() {
     [applyLivePayload, stopPoll],
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/demo/program");
+        const data = await res.json();
+        if (cancelled || !data.ok) {
+          if (!cancelled) setHydrated(true);
+          return;
+        }
+
+        setProgramId(data.program.id);
+        setProgramLabel(data.program.name);
+        setMode("live");
+
+        const latestRes = await fetch(
+          `/api/ops/runs?latest=1&programId=${encodeURIComponent(data.program.id)}`,
+        );
+        const latest = await latestRes.json();
+        if (cancelled) return;
+
+        if (latest.ok && latest.run) {
+          applyLivePayload(latest.run);
+          const status = String(latest.run.status).toUpperCase();
+          if (status === "RUNNING" || status === "QUEUED") {
+            pollRun(latest.run.id);
+          }
+        }
+      } catch {
+        // keep demo mode
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyLivePayload, pollRun]);
+
   const start = useCallback(async () => {
     setError(null);
 
@@ -202,23 +229,38 @@ export function useLiveOpsRun() {
     }
   }, [demo, mode, pollRun, programId]);
 
+  const displayStats = stats ?? {
+    onTrack: 0,
+    students: 0,
+    exceptions: 0,
+    draftNudges: 0,
+  };
+
   const statCards = [
     {
       label: "On track",
-      value: String(stats.onTrack),
-      hint: `of ${stats.students || 12} students`,
+      value: hydrated && stats ? String(displayStats.onTrack) : "—",
+      hint: stats
+        ? `of ${displayStats.students || 12} students`
+        : hydrated
+          ? "run weekly ops"
+          : "loading…",
     },
     {
       label: "Exceptions",
-      value: String(stats.exceptions),
+      value: hydrated && stats ? String(displayStats.exceptions) : "—",
       hint: "need a decision",
     },
     {
       label: "Draft nudges",
-      value: String(stats.draftNudges),
+      value: hydrated && stats ? String(displayStats.draftNudges) : "—",
       hint: "awaiting approval",
     },
-    MOCK_STATS[3],
+    {
+      label: "Last run",
+      value: hydrated ? lastRunDuration : "—",
+      hint: "weekly ops",
+    },
   ];
 
   if (mode === "live") {

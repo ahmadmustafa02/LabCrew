@@ -16,12 +16,12 @@ export default function HomePage() {
         </Link>
         <nav className="flex items-center gap-2">
           <Link
-            href="/app/mission-control"
+            href="/app"
             className="hidden text-sm text-lc-muted transition-colors hover:text-lc-ink sm:inline"
           >
             Product
           </Link>
-          <Link href="/app/mission-control">
+          <Link href="/app">
             <Button variant="secondary" size="sm">
               Open console
             </Button>
@@ -44,12 +44,12 @@ export default function HomePage() {
             your Monday briefing. You approve what matters.
           </p>
           <div className="lc-animate-in lc-delay-3 mt-10 flex flex-wrap items-center gap-3">
-            <Link href="/app/mission-control">
+            <Link href="/app">
               <Button variant="primary" size="lg">
                 Run the demo console
               </Button>
             </Link>
-            <Link href="/app/mission-control">
+            <Link href="/app">
               <Button variant="secondary" size="lg">
                 See Mission Control
               </Button>
