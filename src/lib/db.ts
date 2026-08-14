@@ -34,10 +34,26 @@ function createPrismaClient() {
 
 /** Lazy accessor — safe for scripts/workers; avoids import-time crashes in edge cases. */
 export function getPrisma() {
-  if (!globalForPrisma.prisma) {
+  const existing = globalForPrisma.prisma as
+    | (PrismaClient & Record<string, unknown>)
+    | undefined;
+
+  // After `prisma generate` / schema changes, Next HMR can keep a stale client
+  // without new model delegates (invite, passwordResetToken, storedFile, …).
+  const stale =
+    existing != null &&
+    (typeof existing.passwordResetToken === "undefined" ||
+      typeof existing.invite === "undefined" ||
+      typeof existing.storedFile === "undefined");
+
+  if (!existing || stale) {
+    if (stale) {
+      void existing.$disconnect().catch(() => undefined);
+    }
     globalForPrisma.prisma = createPrismaClient();
   }
-  return globalForPrisma.prisma;
+
+  return globalForPrisma.prisma!;
 }
 
 /** @deprecated prefer getPrisma() */
