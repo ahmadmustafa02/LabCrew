@@ -41,42 +41,47 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = String(credentials?.email ?? "")
-          .trim()
-          .toLowerCase();
-        const password = String(credentials?.password ?? "");
-        if (!email || !password) return null;
+        try {
+          const email = String(credentials?.email ?? "")
+            .trim()
+            .toLowerCase();
+          const password = String(credentials?.password ?? "");
+          if (!email || !password) return null;
 
-        const prisma = getPrisma();
-        const user = await prisma.user.findUnique({
-          where: { email },
-          include: {
-            members: {
-              include: { program: true },
-              orderBy: { createdAt: "asc" },
-              take: 1,
+          const prisma = getPrisma();
+          const user = await prisma.user.findUnique({
+            where: { email },
+            include: {
+              members: {
+                include: { program: true },
+                orderBy: { createdAt: "asc" },
+                take: 1,
+              },
             },
-          },
-        });
+          });
 
-        if (!user?.passwordHash) return null;
-        const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) return null;
+          if (!user?.passwordHash) return null;
+          const ok = await bcrypt.compare(password, user.passwordHash);
+          if (!ok) return null;
 
-        const membership = user.members[0];
-        if (!membership) return null;
+          const membership = user.members[0];
+          if (!membership) return null;
 
-        const role: AppRole =
-          membership.role === MemberRole.STUDENT ? "student" : "director";
+          const role: AppRole =
+            membership.role === MemberRole.STUDENT ? "student" : "director";
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role,
-          memberId: membership.id,
-          programName: membership.program.name,
-        };
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role,
+            memberId: membership.id,
+            programName: membership.program.name,
+          };
+        } catch (error) {
+          console.error("[auth] authorize failed", error);
+          return null;
+        }
       },
     }),
   ],
