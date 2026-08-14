@@ -25,6 +25,7 @@ export function serializeAgentRun(run: {
 }) {
   const summary = (run.summary ?? {}) as {
     briefing?: string;
+    agenda?: string[];
     pendingApprovals?: number;
   };
   const referee = run.steps.find((s) => s.agent === "REFEREE");
@@ -36,6 +37,12 @@ export function serializeAgentRun(run: {
   };
   const coach = run.steps.find((s) => s.agent === "COACH");
   const coachPayload = (coach?.payload ?? {}) as { draftCount?: number };
+  const clerk = run.steps.find((s) => s.agent === "CLERK");
+  const clerkPayload = (clerk?.payload ?? {}) as {
+    briefing?: string;
+    agenda?: string[];
+    pendingApprovals?: number;
+  };
 
   const complete = refereePayload.complete ?? 0;
   const weak = refereePayload.weak ?? 0;
@@ -72,10 +79,7 @@ export function serializeAgentRun(run: {
       exceptions: exceptions.length,
       draftNudges: draftCount,
     },
-    briefing:
-      summary.briefing ??
-      ((run.steps.find((s) => s.agent === "CLERK")?.payload as { briefing?: string })
-        ?.briefing ??
-        null),
+    briefing: summary.briefing ?? clerkPayload.briefing ?? null,
+    agenda: summary.agenda ?? clerkPayload.agenda ?? [],
   };
 }

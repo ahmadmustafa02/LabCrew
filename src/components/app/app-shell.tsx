@@ -21,6 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const nav =
     role === "director"
       ? [
+          { href: "/app/brief", label: "Monday Brief" },
           { href: "/app/mission-control", label: "Mission Control" },
           { href: "/app/assignments", label: "Assignments" },
           { href: "/app/approvals", label: "Approvals" },

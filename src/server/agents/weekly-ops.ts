@@ -242,28 +242,62 @@ export async function executeWeeklyOps(runId: string) {
       agent: AgentName.CLERK,
       title: "Compiled director briefing",
       run: async () => {
+        const refereeStep = await prisma.agentStep.findFirst({
+          where: {
+            runId,
+            agent: AgentName.REFEREE,
+            status: AgentStepStatus.SUCCEEDED,
+          },
+          orderBy: { sortOrder: "desc" },
+        });
+        const referee = (refereeStep?.payload ?? {}) as {
+          complete?: number;
+          weak?: number;
+          missing?: number;
+          exceptions?: { name: string; reason: string; severity: string }[];
+        };
         const pending = await prisma.approvalItem.count({
           where: { programId, status: ApprovalStatus.PENDING },
         });
+        const complete = referee.complete ?? 0;
+        const weak = referee.weak ?? 0;
+        const missing = referee.missing ?? 0;
+        const exceptions = referee.exceptions ?? [];
+        const names = exceptions.slice(0, 3).map((e) => e.name.split(" ")[0]);
+
         const briefing =
           pending === 0
-            ? "All students are in good shape for the active milestone."
-            : "Cohort is mostly healthy. Focus the Monday standup on the exception list in Approvals.";
+            ? `${complete} students are on track for the active milestone. No exception packet this week — use standup for demos and questions.`
+            : `${complete} on track, ${weak} weak, ${missing} missing. Focus Monday on ${names.join(", ") || "the exception list"}. ${pending} Coach draft${pending === 1 ? "" : "s"} wait in Approvals.`;
+
+        const agenda =
+          pending === 0
+            ? [
+                "Quick wins from on-track demos",
+                "Open questions from the cohort",
+                "Next milestone expectations",
+              ]
+            : [
+                `Unblock ${names[0] ?? "at-risk students"} first`,
+                "Approve or edit pending nudges",
+                "Confirm Week deliverable bar for everyone else",
+              ];
+
         const detail =
           pending === 0
             ? "Cohort looks clear — no exception packet needed"
             : `Exception packet ready | ${pending} drafts awaiting director approval`;
 
-        await prisma.agentRun.update({
-          where: { id: runId },
-          data: {
-            summary: { briefing, pendingApprovals: pending },
-          },
-        });
-
         return {
           detail,
-          payload: { briefing, pendingApprovals: pending },
+          payload: {
+            briefing,
+            agenda,
+            pendingApprovals: pending,
+            complete,
+            weak,
+            missing,
+          },
         };
       },
     },
@@ -296,9 +330,18 @@ export async function executeWeeklyOps(runId: string) {
       });
     }
 
-    const summary = {
-      ok: true,
-      finishedAt: new Date().toISOString(),
+    const clerkStep = await prisma.agentStep.findFirst({
+      where: {
+        runId,
+        agent: AgentName.CLERK,
+        status: AgentStepStatus.SUCCEEDED,
+      },
+      orderBy: { sortOrder: "desc" },
+    });
+    const clerkPayload = (clerkStep?.payload ?? {}) as {
+      briefing?: string;
+      agenda?: string[];
+      pendingApprovals?: number;
     };
 
     await prisma.agentRun.update({
@@ -306,7 +349,13 @@ export async function executeWeeklyOps(runId: string) {
       data: {
         status: AgentRunStatus.SUCCEEDED,
         finishedAt: new Date(),
-        summary,
+        summary: {
+          ok: true,
+          finishedAt: new Date().toISOString(),
+          briefing: clerkPayload.briefing ?? null,
+          agenda: clerkPayload.agenda ?? [],
+          pendingApprovals: clerkPayload.pendingApprovals ?? 0,
+        },
       },
     });
 

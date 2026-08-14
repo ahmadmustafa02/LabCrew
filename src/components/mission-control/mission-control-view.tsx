@@ -206,10 +206,15 @@ export function MissionControlView() {
                   "Cohort is mostly healthy. Three students need attention. Coach drafts are waiting on Approvals."
                 : "Clerk will assemble the Monday packet when the crew finishes."}
             </p>
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap gap-2">
               <Link href="/app/approvals">
                 <Button variant="secondary" size="sm" disabled={!showExceptions}>
                   Review drafts
+                </Button>
+              </Link>
+              <Link href="/app/brief">
+                <Button variant="ghost" size="sm">
+                  Monday Brief
                 </Button>
               </Link>
             </div>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/components/session/session-provider";
 
 const DIRECTOR_ONLY = [
+  "/app/brief",
   "/app/mission-control",
   "/app/approvals",
   "/app/analytics",
