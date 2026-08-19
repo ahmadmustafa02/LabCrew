@@ -64,13 +64,16 @@ export function briefToMarkdown(b: BriefExportInput) {
           : c.outlierCheck.flaggedCount > 0
             ? `${c.outlierCheck.flaggedCount} flagged`
             : "no IQR flags";
-      const mean =
-        c.mean === null
-          ? "—"
-          : Number.isInteger(c.mean)
-            ? String(c.mean)
-            : c.mean.toFixed(3);
-      lines.push(`- **${c.columnName}**: n=${c.sampleSize}, mean=${mean}, ${flag}`);
+      if (c.mean === null) {
+        lines.push(
+          `- **${c.columnName}**: n=${c.sampleSize}, mean hidden (insufficient contributors), ${flag}`,
+        );
+      } else {
+        const mean = Number.isInteger(c.mean)
+          ? String(c.mean)
+          : c.mean.toFixed(3);
+        lines.push(`- **${c.columnName}**: n=${c.sampleSize}, mean=${mean}, ${flag}`);
+      }
     }
     lines.push("");
   }
