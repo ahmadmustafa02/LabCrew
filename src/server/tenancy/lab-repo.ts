@@ -127,3 +127,26 @@ export async function findDataPointsForSubmissionInLab(
     orderBy: [{ rowIndex: "asc" }, { columnName: "asc" }],
   });
 }
+
+/** All structured cells for an assignment within one lab (cohort analytics). */
+export async function findDataPointsForMilestoneInLab(
+  labId: string,
+  milestoneId: string,
+) {
+  return getPrisma().submissionDataPoint.findMany({
+    where: {
+      ...inLab(labId),
+      submission: { milestoneId, organizationId: labId },
+    },
+    orderBy: [{ submissionId: "asc" }, { rowIndex: "asc" }, { columnName: "asc" }],
+    include: {
+      submission: {
+        select: {
+          id: true,
+          memberId: true,
+          member: { select: { user: { select: { name: true } } } },
+        },
+      },
+    },
+  });
+}

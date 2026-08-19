@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session/session-provider";
 import type { AssignmentDataSchema, AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
 import { cn } from "@/lib/cn";
+import { CohortDataPanel } from "@/components/assignments/cohort-data-panel";
 
 const inputClass = "lc-input";
 
@@ -751,7 +752,17 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
             </Button>
           </div>
         </section>
-      ) : (
+      ) : null}
+
+      {role === "student" && assignment?.rubric?.acceptData ? (
+        <CohortDataPanel assignmentId={assignmentId} role="student" />
+      ) : null}
+
+      {role === "director" && assignment?.rubric?.acceptData ? (
+        <CohortDataPanel assignmentId={assignmentId} role="director" />
+      ) : null}
+
+      {role === "director" ? (
         <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface">
           <div className="border-b border-[var(--lc-line)] px-5 py-4">
             <h2 className="text-[15px] font-semibold text-lc-ink">
@@ -1018,7 +1029,7 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
             </p>
           ) : null}
         </section>
-      )}
+      ) : null}
     </div>
   );
 }

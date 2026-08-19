@@ -14,8 +14,9 @@
     "db:studio": "prisma studio",
     "worker": "tsx src/server/workers/ops-worker.ts",
     "test:isolation": "tsx --test tests/isolation/isolation.test.ts",
-    "test:data": "tsx --test tests/data/submission-data.test.ts",
-    "test": "tsx --test tests/isolation/isolation.test.ts tests/data/submission-data.test.ts"
+    "test:data": "tsx --test tests/data/*.test.ts",
+    "test": "tsx --test tests/isolation/isolation.test.ts tests/data/*.test.ts",
+    "verify:phase-b": "tsx scripts/verify-phase-b.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -15,6 +15,7 @@ import {
   findAgentRunInLab,
   findApprovalInLab,
   findConversationInLab,
+  findDataPointsForMilestoneInLab,
   findDataPointsForSubmissionInLab,
   findInviteByJoinToken,
   findInviteInLab,
@@ -46,6 +47,8 @@ function printLab(label: string, lab: LabSlice) {
   log(`  directorUserId:         ${lab.directorUserId}`);
   log(`  directorMemberId:       ${lab.directorMemberId}`);
   log(`  studentMemberId:        ${lab.studentMemberId}`);
+  log(`  peerStudentMemberId:    ${lab.peerStudentMemberId}`);
+  log(`  peerSecretValue:        ${lab.peerSecretValue}`);
   log(`  milestoneId:            ${lab.milestoneId}`);
   log(`  submissionId:           ${lab.submissionId}`);
   log(`  runId:                  ${lab.runId}`);
@@ -145,6 +148,31 @@ describe("lab-repo: positive A→A and negative A↛B", () => {
     );
     assert.equal(flipped.length, 0, "B must not see A data points via A submissionId");
     log(`  PASS  - B cannot see A data points → blocked (empty)`);
+  });
+
+  it("student cohort view never includes peer raw rows (same lab)", async () => {
+    log("\n[student peer privacy]");
+    const all = await findDataPointsForMilestoneInLab(
+      fixture.labA.organizationId,
+      fixture.labA.milestoneId,
+    );
+    assert.ok(
+      all.some((c) => c.value === fixture.labA.peerSecretValue),
+      "director/milestone load includes peer cell",
+    );
+    // Same filter the student cohort-data API applies
+    const studentView = all.filter(
+      (c) => c.submission.memberId === fixture.labA.studentMemberId,
+    );
+    assert.ok(
+      studentView.every((c) => c.value !== fixture.labA.peerSecretValue),
+      "student-filtered cells must not include peer secret",
+    );
+    assert.ok(
+      !studentView.some((c) => c.submissionId === fixture.labA.peerSubmissionId),
+      "student view must omit peer submissionId",
+    );
+    log(`  PASS  - student A filter omits peer raw value ${fixture.labA.peerSecretValue}`);
   });
 
   it("IQR recompute stays lab-scoped", async () => {

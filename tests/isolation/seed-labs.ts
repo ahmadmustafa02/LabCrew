@@ -22,6 +22,10 @@ export type LabSlice = {
   directorMemberId: string;
   studentUserId: string;
   studentMemberId: string;
+  peerStudentMemberId: string;
+  peerSubmissionId: string;
+  peerDataPointId: string;
+  peerSecretValue: string;
   milestoneId: string;
   submissionId: string;
   runId: string;
@@ -143,6 +147,45 @@ export async function seedIsolationLabs(): Promise<{
         valueType: DataValueType.TEXT,
       },
     });
+
+    // Second student in the same lab — peer raw rows must never reach student A APIs
+    const peer = await prisma.user.create({
+      data: {
+        email: `peer@${slug}.test`,
+        name: `${name} Peer`,
+        passwordHash,
+      },
+    });
+    const peerMember = await prisma.member.create({
+      data: {
+        organizationId: org.id,
+        programId: program.id,
+        userId: peer.id,
+        role: MemberRole.STUDENT,
+      },
+    });
+    const peerSubmission = await prisma.submission.create({
+      data: {
+        organizationId: org.id,
+        milestoneId: milestone.id,
+        memberId: peerMember.id,
+        status: SubmissionStatus.SUBMITTED,
+        writeup: `Peer writeup for ${slug}`,
+        submittedAt: new Date(),
+      },
+    });
+    const peerSecretValue = `peer-raw-secret-${slug}`;
+    const peerDataPoint = await prisma.submissionDataPoint.create({
+      data: {
+        organizationId: org.id,
+        submissionId: peerSubmission.id,
+        rowIndex: 0,
+        columnName: "secret_metric",
+        value: peerSecretValue,
+        valueType: DataValueType.TEXT,
+      },
+    });
+
     const run = await prisma.agentRun.create({
       data: {
         organizationId: org.id,
@@ -230,6 +273,10 @@ export async function seedIsolationLabs(): Promise<{
       directorMemberId: directorMember.id,
       studentUserId: student.id,
       studentMemberId: studentMember.id,
+      peerStudentMemberId: peerMember.id,
+      peerSubmissionId: peerSubmission.id,
+      peerDataPointId: peerDataPoint.id,
+      peerSecretValue,
       milestoneId: milestone.id,
       submissionId: submission.id,
       runId: run.id,
