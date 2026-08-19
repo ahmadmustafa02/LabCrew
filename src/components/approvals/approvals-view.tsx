@@ -12,12 +12,36 @@ type Approval = {
   title: string;
   body: string;
   targetName: string | null;
+  kind?: string;
   status?: string;
   deliveryStatus?: string | null;
   deliveryChannel?: string | null;
   deliveryError?: string | null;
   deliveredAt?: string | null;
 };
+
+type ResourcePayload = {
+  status: "found" | "empty";
+  query?: string;
+  note?: string;
+  items?: Array<{
+    title: string;
+    url: string;
+    year?: number | null;
+    venue?: string | null;
+    rationale?: string;
+  }>;
+};
+
+function parseResourceBody(body: string): ResourcePayload | null {
+  try {
+    const parsed = JSON.parse(body) as ResourcePayload;
+    if (parsed?.status !== "found" && parsed?.status !== "empty") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 export function ApprovalsView() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
@@ -122,6 +146,8 @@ export function ApprovalsView() {
           showToast(`Emailed${d.to ? ` ${d.to}` : ""} via SMTP`);
         } else if (d?.status === "console") {
           showToast("Logged to console (no SMTP / SMTP failed over)");
+        } else if (d?.status === "applied") {
+          showToast("Resources attached to assignment");
         } else if (d?.status === "failed") {
           showToast(d.error ?? "Delivery failed");
         } else {
@@ -204,12 +230,18 @@ export function ApprovalsView() {
             const busy = busyId === draft.id;
             const pending =
               !draft.status || draft.status === "PENDING" || draft.id.startsWith("demo-");
+            const isResources = draft.kind === "resources";
+            const resourcePayload = isResources
+              ? parseResourceBody(draft.body)
+              : null;
             const deliveryLabel =
               draft.deliveryStatus === "sent"
                 ? `Sent via ${draft.deliveryChannel ?? "SMTP"}`
                 : draft.deliveryStatus === "console"
                   ? "Logged to console"
-                  : draft.deliveryStatus === "failed"
+                  : draft.deliveryStatus === "applied"
+                    ? "Applied to assignment"
+                    : draft.deliveryStatus === "failed"
                     ? `Delivery failed${draft.deliveryError ? `: ${draft.deliveryError}` : ""}`
                     : draft.status === "REJECTED"
                       ? "Rejected"
@@ -227,8 +259,13 @@ export function ApprovalsView() {
                     <div className="max-w-2xl flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-lc-ink">
-                          {draft.targetName ?? draft.title}
+                          {draft.title}
                         </p>
+                        {isResources ? (
+                          <span className="rounded-md bg-black/[0.04] px-2 py-0.5 text-[11px] font-medium text-lc-muted">
+                            Resources
+                          </span>
+                        ) : null}
                         {deliveryLabel ? (
                           <span
                             className={cn(
@@ -237,6 +274,8 @@ export function ApprovalsView() {
                                 "bg-[var(--lc-success-soft)] text-lc-success",
                               draft.deliveryStatus === "console" &&
                                 "bg-[var(--lc-warn-soft)] text-lc-warn",
+                              draft.deliveryStatus === "applied" &&
+                                "bg-[var(--lc-success-soft)] text-lc-success",
                               draft.deliveryStatus === "failed" &&
                                 "bg-[var(--lc-danger-soft)] text-lc-danger",
                               draft.status === "REJECTED" &&
@@ -251,9 +290,51 @@ export function ApprovalsView() {
                         <textarea
                           value={draftBody}
                           onChange={(e) => setDraftBody(e.target.value)}
-                          rows={4}
-                          className="lc-input mt-3 min-h-[96px] py-2.5"
+                          rows={isResources ? 10 : 4}
+                          className="lc-input mt-3 min-h-[96px] py-2.5 font-mono text-xs"
                         />
+                      ) : resourcePayload ? (
+                        <div className="mt-3 space-y-3">
+                          <p className="text-sm leading-relaxed text-lc-muted">
+                            {resourcePayload.note}
+                            {resourcePayload.query
+                              ? ` Query: “${resourcePayload.query}”.`
+                              : ""}
+                          </p>
+                          {resourcePayload.status === "empty" ? (
+                            <p className="rounded-[10px] border border-[var(--lc-warn)]/30 bg-[var(--lc-warn-soft)] px-3 py-2 text-sm text-lc-warn">
+                              Nothing relevant found — no fabricated citations.
+                            </p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {(resourcePayload.items ?? []).map((item) => (
+                                <li
+                                  key={item.url}
+                                  className="rounded-[10px] border border-[var(--lc-line)] px-3 py-2"
+                                >
+                                  <a
+                                    href={item.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-sm font-medium text-lc-ink underline-offset-2 hover:underline"
+                                  >
+                                    {item.title}
+                                  </a>
+                                  <p className="mt-0.5 text-xs text-lc-muted">
+                                    {[item.venue, item.year]
+                                      .filter(Boolean)
+                                      .join(" · ")}
+                                  </p>
+                                  {item.rationale ? (
+                                    <p className="mt-1 text-xs leading-relaxed text-lc-muted">
+                                      {item.rationale}
+                                    </p>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                       ) : (
                         <p className="mt-2 text-sm leading-relaxed text-lc-muted">
                           {draft.body}

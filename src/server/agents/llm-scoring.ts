@@ -1,4 +1,5 @@
 import { chatJson, chatText, llmConfigured } from "@/server/llm/client";
+import type { EngagementTrend } from "@/server/coach/engagement-trend";
 
 export type RubricLike = {
   requireEvidenceUrl?: boolean;
@@ -149,23 +150,35 @@ export async function draftNudge(input: {
   reason: string;
   severity: string;
   milestoneTitle: string;
-}): Promise<{ body: string; source: "llm" | "heuristic" }> {
+  /** Phase B engagement personalization */
+  trend?: EngagementTrend;
+  coachHint?: string;
+  latestScore?: number | null;
+}): Promise<{ body: string; source: "llm" | "heuristic"; trend: EngagementTrend }> {
   const first = input.studentName.split(" ")[0] ?? "there";
-  const heuristic =
-    input.severity === "high"
-      ? `Hi ${first} — ${input.reason}. The smallest next step is a short status note today, even if the demo isn’t perfect.`
-      : `Hi ${first} — ${input.reason}. A tight 5-bullet update against the ${input.milestoneTitle} rubric will unblock review.`;
+  const trend = input.trend ?? "unknown";
+  const heuristic = heuristicNudgeBody({
+    first,
+    reason: input.reason,
+    severity: input.severity,
+    milestoneTitle: input.milestoneTitle,
+    trend,
+  });
 
   if (!llmConfigured()) {
-    return { body: heuristic, source: "heuristic" };
+    return { body: heuristic, source: "heuristic", trend };
   }
 
   const result = await chatText({
-    system: `You are Coach for a research internship lab. Write one short, kind, specific nudge (2–4 sentences, no markdown, no subject line). Human director will approve before send.`,
+    system: `You are Coach for a research internship lab. Write one short, kind, specific nudge (2–4 sentences, no markdown, no subject line). Human director will approve before send.
+${input.coachHint ?? "Write a clear, kind, specific nudge at normal cadence."}
+Tone must visibly match the engagement trend (${trend}).`,
     user: `Student: ${input.studentName}
 Milestone: ${input.milestoneTitle}
 Issue severity: ${input.severity}
 Issue: ${input.reason}
+Engagement trend: ${trend}
+Latest engagement score: ${input.latestScore ?? "unknown"}
 
 Write the nudge body only.`,
     temperature: 0.5,
@@ -173,8 +186,62 @@ Write the nudge body only.`,
 
   if (!result.ok) {
     console.warn("[coach-llm] fallback", result.error);
+    return { body: heuristic, source: "heuristic", trend };
+  }
+
+  return {
+    body: result.text.replace(/^["']|["']$/g, "").trim(),
+    source: "llm",
+    trend,
+  };
+}
+
+function heuristicNudgeBody(input: {
+  first: string;
+  reason: string;
+  severity: string;
+  milestoneTitle: string;
+  trend: EngagementTrend;
+}): string {
+  if (input.trend === "declining") {
+    return `Hi ${input.first} — checking in early because things look heavier this week. ${input.reason}. If you can send even a short status note today, we can unblock the next step together.`;
+  }
+  if (input.trend === "strong") {
+    return `Hi ${input.first} — you've been steady on ${input.milestoneTitle}; keep that cadence. Quick note on ${input.reason.toLowerCase()} so we stay ahead.`;
+  }
+  return input.severity === "high"
+    ? `Hi ${input.first} — ${input.reason}. The smallest next step is a short status note today, even if the demo isn’t perfect.`
+    : `Hi ${input.first} — ${input.reason}. A tight 5-bullet update against the ${input.milestoneTitle} rubric will unblock review.`;
+}
+
+export async function draftPositiveReinforcement(input: {
+  studentName: string;
+  milestoneTitle: string;
+  latestScore: number | null;
+  coachHint: string;
+}): Promise<{ body: string; source: "llm" | "heuristic" }> {
+  const first = input.studentName.split(" ")[0] ?? "there";
+  const heuristic = `Hi ${first} — you've been consistently strong on ${input.milestoneTitle}. Keep the cadence; a short note on what you're tackling next would help us celebrate the progress.`;
+
+  if (!llmConfigured()) {
     return { body: heuristic, source: "heuristic" };
   }
 
-  return { body: result.text.replace(/^["']|["']$/g, "").trim(), source: "llm" };
+  const result = await chatText({
+    system: `You are Coach for a research internship lab. Write one short positive reinforcement note (2–3 sentences, no markdown). Not a rescue nudge. Director approves before send.
+${input.coachHint}`,
+    user: `Student: ${input.studentName}
+Milestone: ${input.milestoneTitle}
+Engagement score: ${input.latestScore ?? "high"}
+Write the body only.`,
+    temperature: 0.5,
+  });
+
+  if (!result.ok) {
+    return { body: heuristic, source: "heuristic" };
+  }
+  return {
+    body: result.text.replace(/^["']|["']$/g, "").trim(),
+    source: "llm",
+  };
 }

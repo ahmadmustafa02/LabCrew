@@ -4,6 +4,10 @@ import { getPrisma } from "@/lib/db";
 import { requireLabDirector } from "@/server/tenancy/lab-scope";
 import { findApprovalInLab } from "@/server/tenancy/lab-repo";
 import { deliverNudge } from "@/server/email/deliver-nudge";
+import {
+  RESOURCE_KIND,
+  applyApprovedResources,
+} from "@/server/coach/resource-suggest";
 
 export const runtime = "nodejs";
 
@@ -77,6 +81,33 @@ export async function PATCH(request: Request, { params }: Params) {
 
     let delivery = null;
     if (action === "approve") {
+      // Phase C resource drafts: attach to milestone; do not email students.
+      if (existing.kind === RESOURCE_KIND) {
+        const applied = await applyApprovedResources({
+          labId: gate.ctx.labId,
+          body: updated.body,
+        });
+        const withDelivery = await prisma.approvalItem.update({
+          where: { id },
+          data: {
+            deliveryStatus: applied.ok ? "applied" : "failed",
+            deliveryChannel: "milestone",
+            deliveryError: applied.ok ? null : applied.error,
+            deliveredAt: new Date(),
+          },
+        });
+        return NextResponse.json({
+          ok: true,
+          approval: serialize(withDelivery),
+          delivery: {
+            ok: applied.ok,
+            status: applied.ok ? "applied" : "failed",
+            channel: "milestone",
+            error: applied.ok ? null : applied.error,
+          },
+        });
+      }
+
       const result = await deliverNudge({
         programId: updated.programId,
         toName: updated.targetName,
@@ -138,6 +169,7 @@ function serialize(item: {
   title: string;
   body: string;
   targetName: string | null;
+  kind?: string;
   status: ApprovalStatus;
   decidedAt: Date | null;
   deliveryStatus?: string | null;
@@ -150,6 +182,7 @@ function serialize(item: {
     title: item.title,
     body: item.body,
     targetName: item.targetName,
+    kind: item.kind ?? "nudge",
     status: item.status,
     decidedAt: item.decidedAt,
     deliveryStatus: item.deliveryStatus ?? null,

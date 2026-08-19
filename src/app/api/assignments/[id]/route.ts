@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
+import { MilestoneStatus, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import type {
+  AssignmentDataSchema,
+  AssignmentRubric,
+  MaterialItem,
+} from "@/lib/assignment-types";
 import { groupCellsToTable, parseDataSchema } from "@/server/data/submission-data";
-import { requireLabScope } from "@/server/tenancy/lab-scope";
-import { findMilestoneDetailInLab } from "@/server/tenancy/lab-repo";
+import { draftResourceSuggestionsForMilestone } from "@/server/coach/resource-suggest";
+import {
+  requireLabDirector,
+  requireLabScope,
+} from "@/server/tenancy/lab-scope";
+import {
+  findMilestoneDetailInLab,
+  findMilestoneInLab,
+} from "@/server/tenancy/lab-repo";
 
 export const runtime = "nodejs";
 
@@ -78,6 +91,8 @@ export async function GET(request: Request, { params }: Params) {
         materials: assignment.materials,
         rubric: assignment.rubric,
         dataSchema: parseDataSchema(assignment.dataSchema),
+        // Approved reading list is director-visible until Phase D student UI ships.
+        coachResources: isDirector ? (assignment.coachResources ?? null) : null,
         dueAt: assignment.dueAt,
         status: assignment.status,
         stats: {
@@ -113,6 +128,114 @@ export async function GET(request: Request, { params }: Params) {
       {
         ok: false,
         error: error instanceof Error ? error.message : "Failed to load assignment",
+      },
+      { status: 503 },
+    );
+  }
+}
+
+export async function PATCH(request: Request, { params }: Params) {
+  try {
+    const gate = await requireLabDirector(request);
+    if ("error" in gate) return gate.error;
+
+    const { id } = await params;
+    const existing = await findMilestoneInLab(gate.ctx.labId, id);
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
+
+    const body = (await request.json()) as {
+      title?: string;
+      description?: string | null;
+      instructions?: string | null;
+      dueAt?: string | null;
+      status?: MilestoneStatus;
+      materials?: MaterialItem[];
+      rubric?: AssignmentRubric;
+      dataSchema?: AssignmentDataSchema | null;
+      refreshResources?: boolean;
+    };
+
+    const title =
+      typeof body.title === "string" && body.title.trim()
+        ? body.title.trim()
+        : existing.title;
+    const description =
+      body.description === undefined
+        ? existing.description
+        : body.description?.trim() || null;
+
+    const topicChanged =
+      title !== existing.title || description !== existing.description;
+
+    const dataSchema =
+      body.dataSchema === undefined
+        ? undefined
+        : parseDataSchema(body.dataSchema);
+
+    const prisma = getPrisma();
+    const assignment = await prisma.milestone.update({
+      where: { id: existing.id },
+      data: {
+        title,
+        description,
+        instructions:
+          body.instructions === undefined
+            ? undefined
+            : body.instructions?.trim() || null,
+        dueAt:
+          body.dueAt === undefined
+            ? undefined
+            : body.dueAt
+              ? new Date(body.dueAt)
+              : null,
+        status: body.status,
+        materials:
+          body.materials === undefined
+            ? undefined
+            : (body.materials as Prisma.InputJsonValue),
+        rubric:
+          body.rubric === undefined
+            ? undefined
+            : (body.rubric as Prisma.InputJsonValue),
+        dataSchema:
+          dataSchema === undefined
+            ? undefined
+            : dataSchema
+              ? (dataSchema as unknown as Prisma.InputJsonValue)
+              : Prisma.DbNull,
+      },
+    });
+
+    let resourceDraft: { approvalId: string; status: string } | null = null;
+    if (topicChanged || body.refreshResources) {
+      try {
+        const drafted = await draftResourceSuggestionsForMilestone({
+          labId: gate.ctx.labId,
+          programId: assignment.programId,
+          milestoneId: assignment.id,
+          title: assignment.title,
+          description: assignment.description,
+        });
+        resourceDraft = {
+          approvalId: drafted.approvalId,
+          status: drafted.payload.status,
+          reusedPending: drafted.reusedPending,
+          searchCacheHit: drafted.searchCacheHit ?? false,
+        };
+      } catch (err) {
+        console.warn("[resources] draft on edit failed", err);
+      }
+    }
+
+    return NextResponse.json({ ok: true, assignment, resourceDraft });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error ? error.message : "Failed to update assignment",
       },
       { status: 503 },
     );

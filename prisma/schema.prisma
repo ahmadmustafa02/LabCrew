@@ -214,6 +214,9 @@ model Milestone {
   /// Optional director-defined columns for DATA submissions:
   /// { columns: [{ name, type: "text"|"number"|"boolean" }] }
   dataSchema     Json?
+  /// Approved Coach reading list (Phase C). Pending drafts live in ApprovalItem.
+  /// { status: "found"|"empty", query, items: [{title,url,year,venue,source,paperId,rationale}], approvedAt }
+  coachResources Json?
   dueAt          DateTime?
   status         MilestoneStatus @default(UPCOMING)
   sortOrder      Int             @default(0)

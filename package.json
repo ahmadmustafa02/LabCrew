@@ -20,7 +20,9 @@
     "verify:phase-c": "tsx scripts/verify-phase-c.ts",
     "verify:phase-d": "tsx scripts/verify-phase-d.ts",
     "verify:brief-privacy": "tsx scripts/verify-brief-privacy.ts",
-    "verify:phase-5a": "tsx scripts/verify-phase-5a.ts"
+    "verify:phase-5a": "tsx scripts/verify-phase-5a.ts",
+    "verify:phase-5b": "tsx scripts/verify-phase-5b.ts",
+    "verify:phase-5c": "tsx scripts/verify-phase-5c.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — Phase A (Engagement signal + score). Phases B–D planned.
+Accepted — Phase A (Engagement signal + score) + Phase B (nudge personalization) + Phase C (resource suggestions). Phase D planned.
 
 ## Context
 
@@ -23,32 +23,34 @@ Store a **lab-scoped, per-student, per-week** row `EngagementScore`:
 | `components` | JSON breakdown of weighted signals |
 | `runId?` | Optional weekly-ops run that wrote the row |
 
-**Signals (existing data only):**
+**Signals (existing data only):** timeliness (30), overdue (20), revision cycles (15), meeting RSVP (20), message responsiveness (15). Missing components renormalize. Directors only.
 
-| Component | Weight | Source |
-| --------- | ------ | ------ |
-| Timeliness | 30 | Active / due milestones: on-time turn-in vs late vs missing |
-| Overdue flag | 20 | `dueAt < now` and not SUBMITTED/SCORED (Pulse-style silence + deadline) |
-| Revision cycles | 15 | `ReviewStatus.NEEDS_REVISION` count proxy on current submissions |
-| Meeting RSVP | 20 | `MeetingInvite.rsvp` for meetings in the week (YES > MAYBE > NO/null) |
-| Message responsiveness | 15 | Student reply after a director message in-thread during the week |
+### Nudge personalization (Phase B)
 
-Missing components (e.g. no meetings that week) are **dropped and weights renormalized**. Attendance beyond RSVP does not exist yet — do not invent check-ins.
+Coach loads the last two weekly scores and classifies **declining / strong / stable / unknown**:
 
-**Visibility:** directors only (Analytics + API). Peers never see another student’s score.
+| Trend | Approvals label | Behavior |
+| ----- | --------------- | -------- |
+| Declining (≥12pt drop) | `warm · send earlier` | Warmer copy; suggest a small step today |
+| Strong (≥75, sustained) | `encourage · reinforce` | Positive reinforcement even without a Referee exception |
+| Stable / unknown | `steady/unknown · standard timing` | Standard kind nudge |
 
-**Compute site:** end of Pulse in `executeWeeklyOps` (upsert for current week). Directors may also trigger recompute via API.
+Still **draft-only** → existing Approvals queue. No send bypass.
 
-### Resource suggestions (Phase C — planned)
+### Resource suggestions (Phase C)
 
-Query **Semantic Scholar** first; fallback **arXiv API**. Groq may only **select + rationalize** from returned hits — never invent titles/links. Drafts use the same Approvals gate as nudges. Empty search → explicit “nothing relevant found.”
+On assignment **create** and **edit** (title/description change):
 
-### Personalization + persuasive UI (Phases B / D — planned)
-
-Coach reads score trend before drafting (Phase B). Student UI follows Fogg Motivation / Ability / Trigger with non-dark-pattern copy (Phase D).
+1. Query **Semantic Scholar** (`/graph/v1/paper/search`); if empty/error → **arXiv** Atom API.
+2. Groq (if configured) may only **select indices + one-line rationale** from the returned catalog — never invent title/URL.
+3. Draft `ApprovalItem` with `kind: "resources"` (JSON body). Empty search → `status: "empty"` with an honest note (no fake success).
+4. On director approve → write `Milestone.coachResources`. No email delivery for resource drafts.
+5. **Student visibility:** `coachResources` is returned on assignment GET for **directors only** until Phase D student UI ships (no student surface yet).
+6. **Rate limiting:** in-process search cache (30 min / query) + reuse pending Approvals draft when title/description query is unchanged (repeat edits do not re-hit S2/arXiv).
 
 ## Consequences
 
-- Isolation suite must cover `EngagementScore` Lab A ↛ Lab B.
+- Isolation suite covers `EngagementScore` Lab A ↛ Lab B.
 - Phase B must not bypass Approvals.
-- Phase C must not ship LLM-fabricated citations.
+- Phase C must not ship LLM-fabricated citations; empty search is explicit.
+- Phase D will surface approved `coachResources` + streaks in student UI.
