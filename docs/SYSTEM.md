@@ -99,4 +99,12 @@ Product look-and-feel (not architecture): [DESIGN.md](./DESIGN.md).
 
 ## Status
 
-**Draft** -- covers tenancy + ops resilience + structured data A-D (including Brief privacy floors) as shipped. Finalize later when Phase 4/5 surfaces land.
+**Draft (approved)** -- index/table shape is intentional: points to deep dives, does not copy the code. Keep the §6 Brief-privacy hotfix note honest (caught after Phase D); do not scrub it for tidiness.
+
+**Finalize (after Phase 4/5)** means **add diagrams**, not only extend tables:
+
+1. C4 **context** diagram
+2. C4 **container** diagram (web / worker / Postgres / Redis)
+3. **Sequence** diagram for the weekly ops pipeline (SYSTEM §4 text flow)
+
+Tracked in [PHASES.md](./PHASES.md) under Phase 6 finalize.
