@@ -217,12 +217,14 @@ export function MondayBriefView() {
                         {c.columnName}
                       </span>
                       {" · "}n={c.sampleSize}
-                      {" · "}mean{" "}
+                      {" · "}
                       {c.mean === null
-                        ? "—"
-                        : Number.isInteger(c.mean)
-                          ? c.mean
-                          : c.mean.toFixed(3)}
+                        ? "mean hidden (insufficient contributors)"
+                        : `mean ${
+                            Number.isInteger(c.mean)
+                              ? c.mean
+                              : c.mean.toFixed(3)
+                          }`}
                       {" · "}
                       {c.outlierCheck.status === "insufficient_sample"
                         ? `IQR pending (need ${c.outlierCheck.minRequired}+)`
