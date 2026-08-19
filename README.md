@@ -87,9 +87,10 @@ Polished SaaS pages with light/dark mode: `/` · `/product` · `/how-it-works` �
 ```bash
 cp .env.example .env
 docker compose up --build
+# or: ./scripts/install.sh   ·   .\scripts\install.ps1
 ```
 
-Open **http://localhost:3000/signup**
+Open **http://localhost:3000/signup** · Admin guide: **[ADMIN.md](./ADMIN.md)**
 
 ### Option B — local Node + Docker infra
 
@@ -108,7 +109,7 @@ npm run worker           # required for live weekly ops
 npm run dev              # http://localhost:3000
 ```
 
-> **Important:** Mission Control’s live crew needs Postgres, Redis, **and** the worker process. Without the worker, the UI may fall back to a demo animation — keep `npm run worker` running for real demos.
+> **Important:** Mission Control live dispatch needs Postgres, Redis, **and** the worker. If Redis is down, the UI shows **pipeline degraded** and blocks dispatch. If Redis is up but the worker is offline, jobs still enqueue and the UI shows **queued — processing delayed**. See [ADMIN.md](./ADMIN.md).
 
 ---
 
@@ -136,7 +137,7 @@ AUTH_URL="http://localhost:3000"
 
 Without `LLM_API_KEY`, scoring and nudge copy use heuristics. Without SMTP, reset links and nudge delivery land in the **server console**.
 
-Full free-host notes: [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md)
+Full free-host notes: [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) · Administrator guide: [ADMIN.md](./ADMIN.md)
 
 ---
 
