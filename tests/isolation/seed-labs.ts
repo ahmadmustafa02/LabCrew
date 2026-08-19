@@ -6,6 +6,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
   AgentRunStatus,
+  DataValueType,
   MemberRole,
   MilestoneStatus,
   PrismaClient,
@@ -31,6 +32,7 @@ export type LabSlice = {
   meetingId: string;
   inviteId: string;
   inviteToken: string;
+  dataPointId: string;
 };
 
 export type IsolationFixture = {
@@ -131,6 +133,16 @@ export async function seedIsolationLabs(): Promise<{
         submittedAt: new Date(),
       },
     });
+    const dataPoint = await prisma.submissionDataPoint.create({
+      data: {
+        organizationId: org.id,
+        submissionId: submission.id,
+        rowIndex: 0,
+        columnName: "secret_metric",
+        value: `lab-secret-${slug}`,
+        valueType: DataValueType.TEXT,
+      },
+    });
     const run = await prisma.agentRun.create({
       data: {
         organizationId: org.id,
@@ -228,6 +240,7 @@ export async function seedIsolationLabs(): Promise<{
       meetingId: meeting.id,
       inviteId: invite.id,
       inviteToken: invite.token,
+      dataPointId: dataPoint.id,
     };
   }
 

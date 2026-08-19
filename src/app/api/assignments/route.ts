@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { MilestoneStatus, Prisma } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import type { AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
+import type {
+  AssignmentDataSchema,
+  AssignmentRubric,
+  MaterialItem,
+} from "@/lib/assignment-types";
 import { requireAuth, requireDirector } from "@/server/auth/api-session";
+import { parseDataSchema } from "@/server/data/submission-data";
 
 export const runtime = "nodejs";
 
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
       status?: MilestoneStatus;
       materials?: MaterialItem[];
       rubric?: AssignmentRubric;
+      dataSchema?: AssignmentDataSchema | null;
       sortOrder?: number;
     };
 
@@ -116,6 +122,8 @@ export async function POST(request: Request) {
       _max: { sortOrder: true },
     });
 
+    const dataSchema = parseDataSchema(body.dataSchema);
+
     const assignment = await prisma.milestone.create({
       data: {
         organizationId,
@@ -127,11 +135,15 @@ export async function POST(request: Request) {
         status: body.status ?? MilestoneStatus.ACTIVE,
         sortOrder: body.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
         materials: (body.materials ?? []) as Prisma.InputJsonValue,
+        dataSchema: dataSchema
+          ? (dataSchema as unknown as Prisma.InputJsonValue)
+          : Prisma.DbNull,
         rubric: (body.rubric ?? {
           requireEvidenceUrl: true,
           requireWriteup: true,
           minWriteupLength: 40,
           checklist: [],
+          acceptData: false,
         }) as Prisma.InputJsonValue,
       },
     });

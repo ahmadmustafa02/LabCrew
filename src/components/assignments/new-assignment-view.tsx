@@ -20,6 +20,10 @@ export function NewAssignmentView() {
   const [requireEvidenceUrl, setRequireEvidenceUrl] = useState(true);
   const [requireWriteup, setRequireWriteup] = useState(true);
   const [requireRepoUrl, setRequireRepoUrl] = useState(false);
+  const [acceptData, setAcceptData] = useState(false);
+  const [dataColumnsText, setDataColumnsText] = useState(
+    "sample_id:text\nod600:number\nhours:number",
+  );
   const [minWriteupLength, setMinWriteupLength] = useState(40);
   const [checklistText, setChecklistText] = useState(
     "Demo runs locally or is publicly reachable\nShort methods + results writeup",
@@ -70,6 +74,26 @@ export function NewAssignmentView() {
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean);
+      const dataSchema = acceptData
+        ? {
+            columns: dataColumnsText
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean)
+              .map((line) => {
+                const [nameRaw, typeRaw] = line.split(":");
+                const name = (nameRaw ?? "").trim();
+                const type =
+                  typeRaw?.trim().toLowerCase() === "number"
+                    ? "number"
+                    : typeRaw?.trim().toLowerCase() === "boolean"
+                      ? "boolean"
+                      : "text";
+                return { name, type };
+              })
+              .filter((c) => c.name),
+          }
+        : null;
       const res = await fetch("/api/assignments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,16 +104,17 @@ export function NewAssignmentView() {
           dueAt: dueAt || null,
           status: "ACTIVE",
           materials,
+          dataSchema,
           rubric: {
             requireEvidenceUrl,
             requireWriteup,
             requireRepoUrl,
             minWriteupLength,
             checklist,
+            acceptData,
           },
         }),
-      });
-      const data = await res.json();
+      });      const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Create failed");
       router.push(`/app/assignments/${data.assignment.id}`);
     } catch (err) {
@@ -267,11 +292,36 @@ export function NewAssignmentView() {
           />
           Require writeup / research notes
         </label>
+        <label className="flex items-center gap-2 text-sm text-lc-ink">
+          <input
+            type="checkbox"
+            checked={acceptData}
+            onChange={(e) => setAcceptData(e.target.checked)}
+          />
+          Accept structured data (CSV / form rows)
+        </label>
+        {acceptData ? (
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-lc-muted">
+              Data columns (one per line: name:type) — optional schema
+            </span>
+            <textarea
+              value={dataColumnsText}
+              onChange={(e) => setDataColumnsText(e.target.value)}
+              rows={4}
+              placeholder={"sample_id:text\nod600:number"}
+              className={inputClass}
+            />
+            <span className="text-xs text-lc-muted">
+              Types: text, number, boolean. Leave blank lines out. Students can
+              still paste CSV matching these headers.
+            </span>
+          </label>
+        ) : null}
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-lc-muted">
             Minimum writeup length
-          </span>
-          <input
+          </span>          <input
             type="number"
             min={10}
             value={minWriteupLength}

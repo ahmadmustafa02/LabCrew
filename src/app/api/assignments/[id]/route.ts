@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getPrisma } from "@/lib/db";
+import { groupCellsToTable, parseDataSchema } from "@/server/data/submission-data";
 import { requireLabScope } from "@/server/tenancy/lab-scope";
 import { findMilestoneDetailInLab } from "@/server/tenancy/lab-repo";
 
@@ -44,6 +46,26 @@ export async function GET(request: Request, { params }: Params) {
         s.reviewStatus === "APPROVED" || s.reviewStatus === "DONE",
     ).length;
 
+    const submissionIds = submissions.map((s) => s.id);
+    const prisma = getPrisma();
+    const allCells =
+      submissionIds.length === 0
+        ? []
+        : await prisma.submissionDataPoint.findMany({
+            where: {
+              organizationId: gate.ctx.labId,
+              submissionId: { in: submissionIds },
+            },
+            orderBy: [{ rowIndex: "asc" }, { columnName: "asc" }],
+          });
+
+    const cellsBySubmission = new Map<string, typeof allCells>();
+    for (const cell of allCells) {
+      const list = cellsBySubmission.get(cell.submissionId) ?? [];
+      list.push(cell);
+      cellsBySubmission.set(cell.submissionId, list);
+    }
+
     return NextResponse.json({
       ok: true,
       assignment: {
@@ -55,6 +77,7 @@ export async function GET(request: Request, { params }: Params) {
         instructions: assignment.instructions,
         materials: assignment.materials,
         rubric: assignment.rubric,
+        dataSchema: parseDataSchema(assignment.dataSchema),
         dueAt: assignment.dueAt,
         status: assignment.status,
         stats: {
@@ -81,6 +104,7 @@ export async function GET(request: Request, { params }: Params) {
           reviewedAt: s.reviewedAt,
           submittedAt: s.submittedAt,
           updatedAt: s.updatedAt,
+          dataTable: groupCellsToTable(cellsBySubmission.get(s.id) ?? []),
         })),
       },
     });

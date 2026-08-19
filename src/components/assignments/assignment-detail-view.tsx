@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session/session-provider";
-import type { AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
+import type { AssignmentDataSchema, AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
 import { cn } from "@/lib/cn";
 
 const inputClass = "lc-input";
@@ -16,6 +16,12 @@ type Attachment = {
   url: string;
   originalName?: string;
   size?: number;
+};
+
+type DataTable = {
+  columns: string[];
+  rows: Array<{ rowIndex: number; values: Record<string, string> }>;
+  cellCount: number;
 };
 
 type ReviewStatus =
@@ -42,6 +48,7 @@ type SubmissionRow = {
   reviewedAt: string | null;
   submittedAt: string | null;
   updatedAt?: string;
+  dataTable?: DataTable | null;
 };
 
 type AssignmentDetail = {
@@ -51,6 +58,7 @@ type AssignmentDetail = {
   instructions: string | null;
   materials: MaterialItem[] | null;
   rubric: AssignmentRubric | null;
+  dataSchema: AssignmentDataSchema | null;
   dueAt: string | null;
   status: string;
   stats: {
@@ -107,6 +115,8 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
   const [writeup, setWriteup] = useState("");
   const [checks, setChecks] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [dataCsv, setDataCsv] = useState("");
+  const [dataTable, setDataTable] = useState<DataTable | null>(null);
   const [linkTitle, setLinkTitle] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -149,6 +159,7 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
       setWriteup(s.writeup ?? "");
       setChecks(Array.isArray(s.checklist) ? (s.checklist as string[]) : []);
       setAttachments(Array.isArray(s.attachments) ? s.attachments : []);
+      if (data.dataTable) setDataTable(data.dataTable);
       setMyReview({
         reviewStatus: s.reviewStatus ?? null,
         reviewComment: s.reviewComment ?? null,
@@ -238,12 +249,17 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
           checklist: checks,
           attachments,
           status,
+          ...(assignment?.rubric?.acceptData
+            ? dataCsv.trim()
+              ? { dataCsv }
+              : {}
+            : {}),
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Submit failed");
-      setToast(status === "SUBMITTED" ? "Submitted for review" : "Draft saved");
-      window.setTimeout(() => setToast(null), 2500);
+      if (data.dataTable) setDataTable(data.dataTable);
+      setToast(status === "SUBMITTED" ? "Submitted for review" : "Draft saved");      window.setTimeout(() => setToast(null), 2500);
       if (status === "SUBMITTED") {
         setMyReview({ reviewStatus: "PENDING_REVIEW", reviewComment: null });
       }
@@ -482,6 +498,76 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
             </label>
           ) : null}
 
+          {rubric?.acceptData ? (
+            <div className="space-y-3 rounded-[12px] border border-[var(--lc-line)] bg-[#fafafa] p-4">
+              <div>
+                <p className="text-[13px] font-semibold text-lc-ink">
+                  Structured data
+                </p>
+                <p className="mt-1 text-sm text-lc-muted">
+                  Paste CSV (header row + data).{" "}
+                  {assignment.dataSchema?.columns?.length
+                    ? `Expected columns: ${assignment.dataSchema.columns
+                        .map((c) => `${c.name} (${c.type})`)
+                        .join(", ")}.`
+                    : "No director schema — all CSV columns will be stored."}
+                </p>
+              </div>
+              <textarea
+                value={dataCsv}
+                onChange={(e) => setDataCsv(e.target.value)}
+                rows={6}
+                placeholder={
+                  "sample_id,od600,hours\nA1,0.42,24\nA2,0.51,24"
+                }
+                className={inputClass}
+              />
+              {dataTable && dataTable.rows.length > 0 ? (
+                <div className="overflow-x-auto rounded-[10px] border border-[var(--lc-line)] bg-lc-surface">
+                  <p className="border-b border-[var(--lc-line)] px-3 py-2 text-xs text-lc-muted">
+                    Saved data · {dataTable.rows.length} row
+                    {dataTable.rows.length === 1 ? "" : "s"} ·{" "}
+                    {dataTable.cellCount} cells
+                  </p>
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-black/[0.02] text-xs text-lc-muted">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">#</th>
+                        {dataTable.columns.map((col) => (
+                          <th key={col} className="px-3 py-2 font-medium">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dataTable.rows.map((row) => (
+                        <tr
+                          key={row.rowIndex}
+                          className="border-t border-[var(--lc-line)]"
+                        >
+                          <td className="px-3 py-2 font-mono text-xs text-lc-muted">
+                            {row.rowIndex + 1}
+                          </td>
+                          {dataTable.columns.map((col) => (
+                            <td key={col} className="px-3 py-2 text-lc-ink">
+                              {row.values[col] ?? "—"}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-lc-muted">
+                  No structured data saved yet — paste CSV and save draft or
+                  submit.
+                </p>
+              )}
+            </div>
+          ) : null}
+
           <div className="space-y-3">
             <div>
               <p className="text-xs font-medium text-lc-muted">Attachments</p>
@@ -699,6 +785,43 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                             <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-lc-ink">
                               {s.writeup}
                             </p>
+                          </div>
+                        ) : null}
+
+                        {s.dataTable && s.dataTable.rows.length > 0 ? (
+                          <div className="overflow-x-auto rounded-[10px] border border-[var(--lc-line)]">
+                            <p className="border-b border-[var(--lc-line)] px-3 py-2 text-xs font-medium text-lc-muted">
+                              Structured data · {s.dataTable.rows.length} rows
+                            </p>
+                            <table className="min-w-full text-left text-sm">
+                              <thead className="bg-black/[0.02] text-xs text-lc-muted">
+                                <tr>
+                                  <th className="px-3 py-2 font-medium">#</th>
+                                  {s.dataTable.columns.map((col) => (
+                                    <th key={col} className="px-3 py-2 font-medium">
+                                      {col}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {s.dataTable.rows.map((row) => (
+                                  <tr
+                                    key={row.rowIndex}
+                                    className="border-t border-[var(--lc-line)]"
+                                  >
+                                    <td className="px-3 py-2 font-mono text-xs text-lc-muted">
+                                      {row.rowIndex + 1}
+                                    </td>
+                                    {s.dataTable!.columns.map((col) => (
+                                      <td key={col} className="px-3 py-2">
+                                        {row.values[col] ?? "—"}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
                         ) : null}
 
