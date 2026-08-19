@@ -20,8 +20,14 @@ type Attachment = {
 
 type DataTable = {
   columns: string[];
-  rows: Array<{ rowIndex: number; values: Record<string, string> }>;
+  rows: Array<{
+    rowIndex: number;
+    values: Record<string, string>;
+    flags?: Record<string, { flagged: boolean; flagReason: string | null }>;
+    rowFlagged?: boolean;
+  }>;
   cellCount: number;
+  flaggedCellCount?: number;
 };
 
 type ReviewStatus =
@@ -81,6 +87,20 @@ const REVIEW_OPTIONS: Array<{
   { value: "DONE", label: "Done" },
 ];
 
+function formatFlagReason(reason: string | null | undefined): string {
+  if (!reason) return "Flagged";
+  return reason
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean)
+    .map((r) => {
+      if (r === "iqr_outlier") return "IQR outlier";
+      if (r === "duplicate_row") return "Duplicate row";
+      if (r === "duplicate_resubmission") return "Duplicate resubmit";
+      return r;
+    })
+    .join(" · ");
+}
 function reviewBadgeClass(status: ReviewStatus) {
   if (status === "APPROVED" || status === "DONE") {
     return "bg-[var(--lc-success-soft)] text-lc-success";
@@ -259,7 +279,13 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Submit failed");
       if (data.dataTable) setDataTable(data.dataTable);
-      setToast(status === "SUBMITTED" ? "Submitted for review" : "Draft saved");      window.setTimeout(() => setToast(null), 2500);
+      const warn =
+        Array.isArray(data.warnings) && data.warnings.length
+          ? ` — ${data.warnings[0]}`
+          : "";
+      setToast(
+        (status === "SUBMITTED" ? "Submitted for review" : "Draft saved") + warn,
+      );      window.setTimeout(() => setToast(null), 2500);
       if (status === "SUBMITTED") {
         setMyReview({ reviewStatus: "PENDING_REVIEW", reviewComment: null });
       }
@@ -507,10 +533,10 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                 <p className="mt-1 text-sm text-lc-muted">
                   Paste CSV (header row + data).{" "}
                   {assignment.dataSchema?.columns?.length
-                    ? `Expected columns: ${assignment.dataSchema.columns
+                    ? `Expected columns (validated): ${assignment.dataSchema.columns
                         .map((c) => `${c.name} (${c.type})`)
                         .join(", ")}.`
-                    : "No director schema — all CSV columns will be stored."}
+                    : "No director schema — any CSV columns accepted; types inferred per cell."}
                 </p>
               </div>
               <textarea
@@ -528,6 +554,9 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                     Saved data · {dataTable.rows.length} row
                     {dataTable.rows.length === 1 ? "" : "s"} ·{" "}
                     {dataTable.cellCount} cells
+                    {dataTable.flaggedCellCount
+                      ? ` · ${dataTable.flaggedCellCount} flagged`
+                      : ""}
                   </p>
                   <table className="min-w-full text-left text-sm">
                     <thead className="bg-black/[0.02] text-xs text-lc-muted">
@@ -544,16 +573,39 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                       {dataTable.rows.map((row) => (
                         <tr
                           key={row.rowIndex}
-                          className="border-t border-[var(--lc-line)]"
+                          className={cn(
+                            "border-t border-[var(--lc-line)]",
+                            row.rowFlagged && "bg-[#fff8f0]",
+                          )}
                         >
                           <td className="px-3 py-2 font-mono text-xs text-lc-muted">
                             {row.rowIndex + 1}
+                            {row.rowFlagged ? (
+                              <span className="ml-1 text-[10px] font-sans font-medium text-[#b45309]">
+                                flagged
+                              </span>
+                            ) : null}
                           </td>
-                          {dataTable.columns.map((col) => (
-                            <td key={col} className="px-3 py-2 text-lc-ink">
-                              {row.values[col] ?? "—"}
-                            </td>
-                          ))}
+                          {dataTable.columns.map((col) => {
+                            const flag = row.flags?.[col];
+                            return (
+                              <td key={col} className="px-3 py-2 text-lc-ink">
+                                <span
+                                  className={cn(
+                                    flag?.flagged &&
+                                      "rounded px-1 font-medium text-[#9a3412] ring-1 ring-[#fdba74]",
+                                  )}
+                                  title={
+                                    flag?.flagged
+                                      ? formatFlagReason(flag.flagReason)
+                                      : undefined
+                                  }
+                                >
+                                  {row.values[col] ?? "—"}
+                                </span>
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                     </tbody>
@@ -792,6 +844,9 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                           <div className="overflow-x-auto rounded-[10px] border border-[var(--lc-line)]">
                             <p className="border-b border-[var(--lc-line)] px-3 py-2 text-xs font-medium text-lc-muted">
                               Structured data · {s.dataTable.rows.length} rows
+                              {s.dataTable.flaggedCellCount
+                                ? ` · ${s.dataTable.flaggedCellCount} flagged`
+                                : ""}
                             </p>
                             <table className="min-w-full text-left text-sm">
                               <thead className="bg-black/[0.02] text-xs text-lc-muted">
@@ -808,16 +863,39 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                                 {s.dataTable.rows.map((row) => (
                                   <tr
                                     key={row.rowIndex}
-                                    className="border-t border-[var(--lc-line)]"
+                                    className={cn(
+                                      "border-t border-[var(--lc-line)]",
+                                      row.rowFlagged && "bg-[#fff8f0]",
+                                    )}
                                   >
                                     <td className="px-3 py-2 font-mono text-xs text-lc-muted">
                                       {row.rowIndex + 1}
+                                      {row.rowFlagged ? (
+                                        <span className="ml-1 text-[10px] font-sans font-medium text-[#b45309]">
+                                          flagged
+                                        </span>
+                                      ) : null}
                                     </td>
-                                    {s.dataTable!.columns.map((col) => (
-                                      <td key={col} className="px-3 py-2">
-                                        {row.values[col] ?? "—"}
-                                      </td>
-                                    ))}
+                                    {s.dataTable!.columns.map((col) => {
+                                      const flag = row.flags?.[col];
+                                      return (
+                                        <td key={col} className="px-3 py-2">
+                                          <span
+                                            className={cn(
+                                              flag?.flagged &&
+                                                "rounded px-1 font-medium text-[#9a3412] ring-1 ring-[#fdba74]",
+                                            )}
+                                            title={
+                                              flag?.flagged
+                                                ? formatFlagReason(flag.flagReason)
+                                                : undefined
+                                            }
+                                          >
+                                            {row.values[col] ?? "—"}
+                                          </span>
+                                        </td>
+                                      );
+                                    })}
                                   </tr>
                                 ))}
                               </tbody>

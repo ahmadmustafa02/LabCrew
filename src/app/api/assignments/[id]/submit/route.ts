@@ -2,11 +2,16 @@ import { NextResponse } from "next/server";
 import { Prisma, ReviewStatus, SubmissionStatus } from "@prisma/client";
 import type { AssignmentRubric } from "@/lib/assignment-types";
 import { getPrisma } from "@/lib/db";
+import { recomputeIqrFlagsForMilestone } from "@/server/data/data-quality";
 import {
+  FLAG_DUPLICATE_RESUBMIT,
+  fingerprintRowSet,
   groupCellsToTable,
+  mergeFlagReasons,
   parseCsvToRows,
   parseDataSchema,
   rowsToDataPoints,
+  validateCsvHeadersAgainstSchema,
   type DataRowInput,
 } from "@/server/data/submission-data";
 import { requireLabStudent } from "@/server/tenancy/lab-scope";
@@ -74,6 +79,7 @@ export async function GET(request: Request, { params }: Params) {
       submission,
       dataSchema: parseDataSchema(milestone.dataSchema),
       acceptData: Boolean(rubricOf(milestone).acceptData),
+      requireData: Boolean(rubricOf(milestone).requireData),
       dataTable,
     });
   } catch (error) {
@@ -102,11 +108,8 @@ export async function POST(request: Request, { params }: Params) {
       checklist?: string[];
       attachments?: Attachment[];
       status?: "DRAFT" | "SUBMITTED";
-      /** Object rows from the dynamic form */
       dataRows?: DataRowInput[];
-      /** Raw CSV text (header + rows) */
       dataCsv?: string;
-      /** If true, clear existing data points without replacing */
       clearData?: boolean;
     };
 
@@ -121,8 +124,11 @@ export async function POST(request: Request, { params }: Params) {
     const rubric = rubricOf(milestone);
     const schema = parseDataSchema(milestone.dataSchema);
     const acceptData = Boolean(rubric.acceptData);
+    const requireData = Boolean(rubric.requireData);
 
     let dataCells: ReturnType<typeof rowsToDataPoints>["cells"] | null = null;
+    let warnings: string[] = [];
+
     if (acceptData) {
       if (body.clearData) {
         dataCells = [];
@@ -131,6 +137,13 @@ export async function POST(request: Request, { params }: Params) {
         if (parsed.error) {
           return NextResponse.json(
             { ok: false, error: parsed.error },
+            { status: 400 },
+          );
+        }
+        const headerErr = validateCsvHeadersAgainstSchema(parsed.headers, schema);
+        if (headerErr) {
+          return NextResponse.json(
+            { ok: false, error: headerErr },
             { status: 400 },
           );
         }
@@ -161,6 +174,19 @@ export async function POST(request: Request, { params }: Params) {
     const status =
       body.status === "DRAFT" ? SubmissionStatus.DRAFT : SubmissionStatus.SUBMITTED;
 
+    if (
+      acceptData &&
+      requireData &&
+      status === SubmissionStatus.SUBMITTED &&
+      dataCells !== null &&
+      dataCells.length === 0
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Structured data is required for this assignment" },
+        { status: 400 },
+      );
+    }
+
     const attachments = Array.isArray(body.attachments) ? body.attachments : [];
 
     const data = {
@@ -183,6 +209,30 @@ export async function POST(request: Request, { params }: Params) {
 
     const prisma = getPrisma();
     const submission = await prisma.$transaction(async (tx) => {
+      const existing = await tx.submission.findUnique({
+        where: { milestoneId_memberId: { milestoneId, memberId } },
+      });
+
+      if (dataCells && dataCells.length > 0 && existing) {
+        const prev = await tx.submissionDataPoint.findMany({
+          where: { submissionId: existing.id, organizationId: labId },
+          select: { rowIndex: true, columnName: true, value: true },
+        });
+        if (
+          prev.length > 0 &&
+          fingerprintRowSet(prev) === fingerprintRowSet(dataCells)
+        ) {
+          dataCells = dataCells.map((c) => ({
+            ...c,
+            flagged: true,
+            flagReason: mergeFlagReasons(c.flagReason, FLAG_DUPLICATE_RESUBMIT),
+          }));
+          warnings.push(
+            "This data matches your previous submission and was flagged as a duplicate resubmission.",
+          );
+        }
+      }
+
       const row = await tx.submission.upsert({
         where: {
           milestoneId_memberId: { milestoneId, memberId },
@@ -229,9 +279,28 @@ export async function POST(request: Request, { params }: Params) {
               columnName: c.columnName,
               value: c.value,
               valueType: c.valueType,
+              flagged: Boolean(c.flagged),
+              flagReason: c.flagReason ?? null,
             })),
           });
         }
+      }
+
+      if (
+        acceptData &&
+        requireData &&
+        status === SubmissionStatus.SUBMITTED
+      ) {
+        const count = await tx.submissionDataPoint.count({
+          where: { submissionId: row.id, organizationId: labId },
+        });
+        if (count === 0) {
+          throw new Error("Structured data is required for this assignment");
+        }
+      }
+
+      if (dataCells !== null) {
+        await recomputeIqrFlagsForMilestone(tx, labId, milestoneId);
       }
 
       return row;
@@ -243,14 +312,13 @@ export async function POST(request: Request, { params }: Params) {
       ok: true,
       submission,
       dataTable: groupCellsToTable(cells),
+      warnings: warnings.length ? warnings : undefined,
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: error instanceof Error ? error.message : "Failed to submit",
-      },
-      { status: 503 },
-    );
+    const message =
+      error instanceof Error ? error.message : "Failed to submit";
+    const status =
+      message === "Structured data is required for this assignment" ? 400 : 503;
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

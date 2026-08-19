@@ -21,6 +21,7 @@ export function NewAssignmentView() {
   const [requireWriteup, setRequireWriteup] = useState(true);
   const [requireRepoUrl, setRequireRepoUrl] = useState(false);
   const [acceptData, setAcceptData] = useState(false);
+  const [requireData, setRequireData] = useState(false);
   const [dataColumnsText, setDataColumnsText] = useState(
     "sample_id:text\nod600:number\nhours:number",
   );
@@ -112,6 +113,7 @@ export function NewAssignmentView() {
             minWriteupLength,
             checklist,
             acceptData,
+            requireData: acceptData && requireData,
           },
         }),
       });      const data = await res.json();
@@ -301,22 +303,32 @@ export function NewAssignmentView() {
           Accept structured data (CSV / form rows)
         </label>
         {acceptData ? (
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-lc-muted">
-              Data columns (one per line: name:type) — optional schema
-            </span>
-            <textarea
-              value={dataColumnsText}
-              onChange={(e) => setDataColumnsText(e.target.value)}
-              rows={4}
-              placeholder={"sample_id:text\nod600:number"}
-              className={inputClass}
-            />
-            <span className="text-xs text-lc-muted">
-              Types: text, number, boolean. Leave blank lines out. Students can
-              still paste CSV matching these headers.
-            </span>
-          </label>
+          <>
+            <label className="flex items-center gap-2 text-sm text-lc-ink">
+              <input
+                type="checkbox"
+                checked={requireData}
+                onChange={(e) => setRequireData(e.target.checked)}
+              />
+              Require structured data on submit
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-lc-muted">
+                Data columns (one per line: name:type) — optional schema
+              </span>
+              <textarea
+                value={dataColumnsText}
+                onChange={(e) => setDataColumnsText(e.target.value)}
+                rows={4}
+                placeholder={"sample_id:text\nod600:number"}
+                className={inputClass}
+              />
+              <span className="text-xs text-lc-muted">
+                When set, CSV must include these columns and values are type-checked.
+                Leave empty for freeform CSV (types inferred per cell).
+              </span>
+            </label>
+          </>
         ) : null}
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-lc-muted">
