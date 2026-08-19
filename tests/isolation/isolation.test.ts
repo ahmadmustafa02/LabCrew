@@ -32,6 +32,14 @@ import {
   revokeApiAccessToken,
 } from "../../src/server/auth/api-tokens";
 import { resolveLabContext } from "../../src/server/tenancy/lab-scope";
+import {
+  coachResourcesForStudent,
+  loadApprovedNudgeForStudent,
+  loadStudentProgress,
+} from "../../src/server/coach/student-coach";
+import { GET as portalHomeGet } from "../../src/app/api/portal/home/route";
+import { GET as assignmentGet } from "../../src/app/api/assignments/[id]/route";
+import { GET as engagementGet } from "../../src/app/api/engagement/route";
 import { seedIsolationLabs, type IsolationFixture, type LabSlice } from "./seed-labs";
 
 let fixture: IsolationFixture;
@@ -176,6 +184,145 @@ describe("lab-repo: positive A→A and negative A↛B", () => {
         fixture.labA.engagementScoreId,
       ),
     );
+  });
+
+  it("Phase D student coach: pace / nudge / resources isolation", async () => {
+    log("\n[phase-d student coach]");
+
+    // Helper-level: approved nudge lab-scoped; pending never returned
+    const nudgeA = await loadApprovedNudgeForStudent({
+      labId: fixture.labA.organizationId,
+      programId: fixture.labA.programId,
+      email: "student@iso-lab-a.test",
+      name: "Isolation Lab A Student",
+    });
+    assert.ok(nudgeA, "Lab A student should see approved nudge");
+    assert.equal(nudgeA.id, fixture.labA.approvedNudgeId);
+    assert.match(nudgeA.body, /APPROVED-NUDGE-iso-lab-a/);
+    assert.doesNotMatch(nudgeA.body, /PENDING-ONLY/);
+    log(`  PASS  + A approved nudge only → ${nudgeA.id}`);
+
+    const crossNudge = await loadApprovedNudgeForStudent({
+      labId: fixture.labA.organizationId,
+      programId: fixture.labA.programId,
+      email: "student@iso-lab-b.test",
+      name: "Isolation Lab B Student",
+    });
+    assert.equal(
+      crossNudge,
+      null,
+      "Lab A scope must not return Lab B student nudge even with B email",
+    );
+    log("  PASS  - A lab + B email → null (no cross-lab nudge)");
+
+    const progress = await loadStudentProgress({
+      labId: fixture.labA.organizationId,
+      programId: fixture.labA.programId,
+      memberId: fixture.labA.studentMemberId,
+    });
+    assert.ok(typeof progress.headline === "string");
+    assert.ok(!("score" in progress), "progress must not include raw score");
+    assert.ok(
+      !("engagementScore" in progress),
+      "progress must not include engagementScore",
+    );
+    log(`  PASS  + progress framed only → "${progress.headline}"`);
+
+    // Milestone resources: A student sees A approved list; not B's via wrong lab
+    const mileA = await findMilestoneInLab(
+      fixture.labA.organizationId,
+      fixture.labA.milestoneId,
+    );
+    const resA = coachResourcesForStudent(mileA?.coachResources);
+    assert.ok(resA?.items?.length);
+    assert.match(resA!.items[0].rationale, /lab-secret-resource-iso-lab-a/);
+    log("  PASS  + A approved coachResources shaped for student");
+
+    const mileBAsA = await findMilestoneInLab(
+      fixture.labA.organizationId,
+      fixture.labB.milestoneId,
+    );
+    assert.equal(mileBAsA, null, "A cannot load B milestone");
+    log("  PASS  - A cannot load B milestone for resources");
+
+    // HTTP: student A bearer — portal + assignment + engagement deny
+    const stuTok = await issueApiAccessToken({
+      userId: fixture.labA.studentUserId,
+      organizationId: fixture.labA.organizationId,
+      programId: fixture.labA.programId,
+      memberId: fixture.labA.studentMemberId,
+      name: "iso-phase-d-student-a",
+      expiresAt: null,
+    });
+    try {
+      const homeReq = new Request("http://localhost/api/portal/home", {
+        headers: { Authorization: `Bearer ${stuTok.token}` },
+      });
+      const homeRes = await portalHomeGet(homeReq);
+      const homeJson = (await homeRes.json()) as {
+        ok?: boolean;
+        home?: {
+          coach?: {
+            progress?: Record<string, unknown>;
+            nudge?: { id?: string; body?: string } | null;
+          };
+        };
+      };
+      assert.equal(homeRes.status, 200);
+      assert.ok(homeJson.home?.coach?.progress);
+      assert.ok(!("score" in (homeJson.home.coach.progress ?? {})));
+      assert.equal(
+        homeJson.home?.coach?.nudge?.id,
+        fixture.labA.approvedNudgeId,
+      );
+      assert.doesNotMatch(
+        homeJson.home?.coach?.nudge?.body ?? "",
+        /PENDING-ONLY/,
+      );
+      const blob = JSON.stringify(homeJson);
+      assert.doesNotMatch(blob, /"score"\s*:\s*42/);
+      assert.doesNotMatch(blob, /secret-engagement/);
+      log("  PASS  + portal home: framed pace + approved nudge; no raw score");
+
+      const asgReq = new Request(
+        `http://localhost/api/assignments/${fixture.labA.milestoneId}`,
+        { headers: { Authorization: `Bearer ${stuTok.token}` } },
+      );
+      const asgRes = await assignmentGet(asgReq, {
+        params: Promise.resolve({ id: fixture.labA.milestoneId }),
+      });
+      const asgJson = (await asgRes.json()) as {
+        assignment?: {
+          coachResources?: { items?: Array<{ rationale?: string }> };
+        };
+      };
+      assert.equal(asgRes.status, 200);
+      assert.match(
+        asgJson.assignment?.coachResources?.items?.[0]?.rationale ?? "",
+        /lab-secret-resource-iso-lab-a/,
+      );
+      log("  PASS  + assignment GET returns approved resources for student A");
+
+      const crossAsg = await assignmentGet(
+        new Request(
+          `http://localhost/api/assignments/${fixture.labB.milestoneId}`,
+          { headers: { Authorization: `Bearer ${stuTok.token}` } },
+        ),
+        { params: Promise.resolve({ id: fixture.labB.milestoneId }) },
+      );
+      assert.equal(crossAsg.status, 404, "student A must not read B assignment");
+      log("  PASS  - student A assignment B → 404");
+
+      const engRes = await engagementGet(
+        new Request("http://localhost/api/engagement", {
+          headers: { Authorization: `Bearer ${stuTok.token}` },
+        }),
+      );
+      assert.equal(engRes.status, 403, "students cannot hit engagement API");
+      log("  PASS  - student A /api/engagement → 403");
+    } finally {
+      await revokeApiAccessToken(stuTok.id, fixture.labA.organizationId);
+    }
   });
 
   it("student cohort view never includes peer raw rows (same lab)", async () => {

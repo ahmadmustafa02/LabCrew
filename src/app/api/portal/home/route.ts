@@ -134,8 +134,22 @@ export async function GET(request: Request) {
           role: d.role,
         })),
         coach: {
-          progress,
-          nudge,
+          progress: {
+            streak: progress.streak,
+            submittedCount: progress.submittedCount,
+            milestoneCount: progress.milestoneCount,
+            openCount: progress.openCount,
+            headline: progress.headline,
+            detail: progress.detail,
+          },
+          nudge: nudge
+            ? {
+                id: nudge.id,
+                title: nudge.title,
+                body: nudge.body,
+                decidedAt: nudge.decidedAt,
+              }
+            : null,
         },
       },
     });

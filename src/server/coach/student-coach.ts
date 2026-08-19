@@ -162,11 +162,15 @@ export async function loadStudentProgress(input: {
     submittedCount,
     milestoneCount: milestones.length,
     openCount,
-    ...copy,
+    headline: copy.headline,
+    detail: copy.detail,
   };
 }
 
-/** Latest approved/edited nudge aimed at this student (email or name match). */
+/**
+ * Latest approved/edited nudge for this student only.
+ * PENDING / REJECTED are structurally excluded from the query (not filtered in JS).
+ */
 export async function loadApprovedNudgeForStudent(input: {
   labId: string;
   programId: string;
@@ -189,15 +193,23 @@ export async function loadApprovedNudgeForStudent(input: {
     take: 5,
   });
 
-  const match =
-    items.find(
-      (i) =>
-        i.deliveryStatus === "sent" ||
+  // Defense in depth — never return a non-approved row even if query drifts
+  const match = items.find(
+    (i) =>
+      (i.status === ApprovalStatus.APPROVED ||
+        i.status === ApprovalStatus.EDITED) &&
+      (i.deliveryStatus === "sent" ||
         i.deliveryStatus === "console" ||
-        i.deliveryStatus == null,
-    ) ?? items[0];
-
+        i.deliveryStatus == null),
+  );
   if (!match) return null;
+  if (
+    match.status !== ApprovalStatus.APPROVED &&
+    match.status !== ApprovalStatus.EDITED
+  ) {
+    return null;
+  }
+
   return {
     id: match.id,
     title: match.title,
