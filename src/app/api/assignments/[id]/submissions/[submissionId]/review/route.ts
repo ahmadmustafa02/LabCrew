@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { ReviewStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import { requireLabDirector } from "@/server/tenancy/lab-scope";
 import {
-  assertSameProgram,
-  requireDirector,
-} from "@/server/auth/api-session";
+  findMilestoneInLab,
+  findSubmissionInLab,
+} from "@/server/tenancy/lab-repo";
 import { createNotifications } from "@/server/notifications/create";
 
 export const runtime = "nodejs";
@@ -20,7 +21,7 @@ const ALLOWED: ReviewStatus[] = [
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
     const { id: milestoneId, submissionId } = await params;
@@ -42,22 +43,14 @@ export async function PATCH(request: Request, { params }: Params) {
     }
     const reviewStatus = statusRaw as ReviewStatus;
 
-    const prisma = getPrisma();
-    const submission = await prisma.submission.findUnique({
-      where: { id: submissionId },
-      include: {
-        milestone: true,
-        member: { include: { user: true } },
-      },
-    });
+    const milestone = await findMilestoneInLab(gate.ctx.labId, milestoneId);
+    const submission = await findSubmissionInLab(gate.ctx.labId, submissionId);
 
-    if (!submission || submission.milestoneId !== milestoneId) {
+    if (!milestone || !submission || submission.milestoneId !== milestoneId) {
       return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     }
 
-    const wrong = assertSameProgram(gate.session, submission.milestone.programId);
-    if (wrong) return wrong;
-
+    const prisma = getPrisma();
     const updated = await prisma.submission.update({
       where: { id: submissionId },
       data: {
@@ -67,7 +60,7 @@ export async function PATCH(request: Request, { params }: Params) {
             ? body.reviewComment.trim() || null
             : undefined,
         reviewedAt: new Date(),
-        reviewedById: gate.session.membership.id,
+        reviewedById: gate.ctx.membership.id,
       },
     });
 
@@ -82,10 +75,11 @@ export async function PATCH(request: Request, { params }: Params) {
 
     await createNotifications([
       {
-        programId: submission.milestone.programId,
+        organizationId: gate.ctx.labId,
+        programId: milestone.programId,
         memberId: submission.memberId,
         kind: "REVIEW",
-        title: `${label}: ${submission.milestone.title}`,
+        title: `${label}: ${milestone.title}`,
         body:
           updated.reviewComment?.slice(0, 160) ||
           `Your submission was marked ${label.toLowerCase()}.`,
@@ -99,7 +93,7 @@ export async function PATCH(request: Request, { params }: Params) {
         id: updated.id,
         reviewStatus: updated.reviewStatus,
         reviewComment: updated.reviewComment,
-        reviewedAt: updated.reviewedAt?.toISOString() ?? null,
+        reviewedAt: updated.reviewedAt,
       },
     });
   } catch (error) {

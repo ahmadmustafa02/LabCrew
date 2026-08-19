@@ -1,39 +1,23 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/db";
-import {
-  assertSameProgram,
-  requireDirector,
-} from "@/server/auth/api-session";
+import { requireLabDirector } from "@/server/tenancy/lab-scope";
+import { findAgentRunInLab } from "@/server/tenancy/lab-repo";
 import { serializeAgentRun } from "@/server/ops/serialize-run";
 
 export const runtime = "nodejs";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
     const { id } = await params;
-    const prisma = getPrisma();
-    const run = await prisma.agentRun.findUnique({
-      where: { id },
-      include: {
-        steps: { orderBy: { sortOrder: "asc" } },
-        approvals: {
-          where: { status: "PENDING" },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
+    const run = await findAgentRunInLab(gate.ctx.labId, id);
 
     if (!run) {
       return NextResponse.json({ ok: false, error: "Run not found" }, { status: 404 });
     }
-
-    const wrong = assertSameProgram(gate.session, run.programId);
-    if (wrong) return wrong;
 
     return NextResponse.json({ ok: true, run: serializeAgentRun(run) });
   } catch (error) {

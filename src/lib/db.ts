@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 /** Bump when Prisma schema fields change so HMR drops a stale client. */
-const PRISMA_SCHEMA_REV = 3;
+const PRISMA_SCHEMA_REV = 4;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -55,6 +55,7 @@ export function getPrisma() {
     "announcement",
     "announcementRecipient",
     "programOpsSchedule",
+    "apiAccessToken",
   ] as const;
 
   const stale =

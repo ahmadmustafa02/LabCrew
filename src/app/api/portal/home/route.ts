@@ -1,18 +1,20 @@
 import { MemberRole, MilestoneStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
-import { requireStudent } from "@/server/auth/api-session";
+import { inLab, requireLabStudent } from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const gate = await requireStudent();
+    const gate = await requireLabStudent(request);
     if ("error" in gate) return gate.error;
 
     const prisma = getPrisma();
-    const programId = gate.session.membership.programId;
-    const memberId = gate.session.membership.id;
+    const programId = gate.ctx.membership.programId;
+    const memberId = gate.ctx.membership.id;
+    const labId = gate.ctx.labId;
+    const lab = inLab(labId);
     const now = new Date();
 
     const [meetings, milestones, notifications, unreadCount] =
@@ -20,11 +22,12 @@ export async function GET() {
         prisma.meeting.findMany({
           where: {
             programId,
-            invites: { some: { memberId } },
+            ...lab,
+            invites: { some: { memberId, organizationId: labId } },
             startsAt: { gte: new Date(now.getTime() - 2 * 60 * 60 * 1000) },
           },
           include: {
-            invites: { where: { memberId } },
+            invites: { where: { memberId, organizationId: labId } },
           },
           orderBy: { startsAt: "asc" },
           take: 5,
@@ -32,18 +35,22 @@ export async function GET() {
         prisma.milestone.findMany({
           where: {
             programId,
+            ...lab,
             status: { in: [MilestoneStatus.ACTIVE, MilestoneStatus.UPCOMING] },
           },
           include: {
-            submissions: { where: { memberId }, take: 1 },
+            submissions: {
+              where: { memberId, organizationId: labId },
+              take: 1,
+            },
           },
           orderBy: [{ status: "asc" }, { dueAt: "asc" }],
           take: 6,
         }),
-        // Inbox = unread only. Meetings already have an Upcoming section.
         prisma.notification.findMany({
           where: {
             memberId,
+            organizationId: labId,
             readAt: null,
             kind: { not: "MEETING" },
           },
@@ -53,13 +60,13 @@ export async function GET() {
         prisma.notification.count({
           where: {
             memberId,
+            organizationId: labId,
             readAt: null,
             kind: { not: "MEETING" },
           },
         }),
       ]);
 
-    // One row per message thread — don't dump every chat ping.
     const inbox: typeof notifications = [];
     let sawMessage = false;
     for (const n of notifications) {
@@ -74,6 +81,7 @@ export async function GET() {
     const directors = await prisma.member.findMany({
       where: {
         programId,
+        organizationId: labId,
         role: { in: [MemberRole.ADMIN, MemberRole.MENTOR] },
       },
       include: { user: true },

@@ -108,6 +108,7 @@ export async function POST(request: Request) {
     }
 
     const programId = gate.session.membership.programId;
+    const organizationId = gate.session.membership.organizationId;
     const prisma = getPrisma();
 
     const maxSort = await prisma.milestone.aggregate({
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
 
     const assignment = await prisma.milestone.create({
       data: {
+        organizationId,
         programId,
         title: body.title.trim(),
         description: body.description?.trim() || null,

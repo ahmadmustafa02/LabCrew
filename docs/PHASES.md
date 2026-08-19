@@ -1,40 +1,34 @@
 # Build phases
 
-## Phase 0 — Lock (done)
+## Product v1 (done)
 
-- Product positioning, design tokens, phase plan
-- Explicit non-goals (no PR review, no fake agents in prod path)
+- Platform shell, agent runtime, director loop, Auth.js, Docker Compose
 
-## Phase 1 — Platform shell (done)
+## Upgrade track (approved)
 
-- Next.js app + design system
-- Marketing landing + app shell
-- Mission Control UI
-- Prisma schema + docker compose Postgres/Redis
+### Phase 1 — Multi-tenancy hardening (in progress)
 
-## Phase 2 — Agent runtime (done)
+- **1a:** `organizationId` (= labId); `requireLabScope` + `find*InLab` (no middleware); bearer tokens; high-risk ID routes; isolation suite + CI workflow
+- **1b (blocking before Phase 2):** meetings / messages / invites / portal on `requireLabScope`; invite accept by join-token only (no id lookup); bearer rate limit + revoke API; verbose A/B + bearer cross-lab isolation tests
+- Follow-up: mark **Isolation** as a **required** status check on `master` (workflow present ≠ merge-blocking). Same CI gate for CodePulse.
 
-- Redis + BullMQ worker
-- Dispatcher → Pulse → Referee → Coach → Clerk
-- Mission Control enqueue + poll
+### Phase 2 — Pipeline degraded (not silent demo)
 
-## Phase 3 — Director loop (done)
+- Redis unreachable → block dispatch, show degraded
+- Worker down but Redis up → allow enqueue, show “queued, processing delayed”
+- No silent mock replay for authenticated ops
 
-- Approvals (edit / approve / reject)
-- Analytics
-- Assignments + student submit
-- Monday Brief as director home
+### Phase 3 — Installation blueprint
 
-## Phase 4 — Ship (done)
+- Harden one-command Compose + **ADMIN.md**
 
-- Auth.js credentials login
-- Docker Compose: postgres, redis, migrate, web, worker
-- Optional Resend on approve
-- README 2-minute walkthrough
+### Phase 6 draft — System design docs (after 1–3)
 
-## Optional next (post-v1)
+### Phase 4 ∥ 5 — Flutter offline companion + recommender / persuasive UI
 
-- Production host (Fly / Railway / VPS) with managed Postgres+Redis
-- Real LLM Referee/Coach prompts
-- PDF/repo deep evidence briefs
-- SSE live step stream
+- Conflict policy: server baseline; never silent discard of offline draft; user chooses keep mine / view theirs
+- Flutter in monorepo `apps/mobile`
+
+### Phase 6 finalize
+
+### Phase 7 — Usability study (human track, parallel)

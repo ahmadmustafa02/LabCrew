@@ -2,19 +2,20 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { MemberRole } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import { requireDirector } from "@/server/auth/api-session";
+import { inLab, requireLabDirector } from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
     const prisma = getPrisma();
     const invites = await prisma.invite.findMany({
       where: {
-        programId: gate.session.membership.programId,
+        ...inLab(gate.ctx.labId),
+        programId: gate.ctx.membership.programId,
         acceptedAt: null,
         expiresAt: { gt: new Date() },
       },
@@ -47,7 +48,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
     const body = (await request.json()) as { email?: string; role?: string };
@@ -62,11 +63,12 @@ export async function POST(request: Request) {
         : MemberRole.STUDENT;
 
     const prisma = getPrisma();
-    const programId = gate.session.membership.programId;
+    const programId = gate.ctx.membership.programId;
+    const organizationId = gate.ctx.labId;
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
-      include: { members: { where: { programId } } },
+      include: { members: { where: { programId, organizationId } } },
     });
     if (existingUser?.members.length) {
       return NextResponse.json(
@@ -80,11 +82,12 @@ export async function POST(request: Request) {
 
     const invite = await prisma.invite.create({
       data: {
+        organizationId,
         programId,
         email,
         role,
         token,
-        invitedById: gate.session.userId,
+        invitedById: gate.ctx.userId,
         expiresAt,
       },
     });

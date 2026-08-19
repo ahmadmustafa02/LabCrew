@@ -148,6 +148,7 @@ export async function POST(req: Request) {
 
     const row = await prisma.announcement.create({
       data: {
+        organizationId: gate.session.membership.organizationId,
         programId,
         createdById: gate.session.membership.id,
         title,
@@ -155,6 +156,7 @@ export async function POST(req: Request) {
         audience,
         recipients: {
           create: targets.map((t) => ({
+            organizationId: gate.session.membership.organizationId,
             memberId: t.id,
             notifiedAt: new Date(),
           })),
@@ -167,6 +169,7 @@ export async function POST(req: Request) {
     });
 
     await notifyAnnouncement({
+      organizationId: gate.session.membership.organizationId,
       programId,
       title,
       body: text,

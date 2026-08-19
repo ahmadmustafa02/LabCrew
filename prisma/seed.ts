@@ -35,6 +35,7 @@ async function main() {
   await prisma.approvalItem.deleteMany();
   await prisma.storedFile.deleteMany();
   await prisma.passwordResetToken.deleteMany();
+  await prisma.apiAccessToken.deleteMany();
   await prisma.invite.deleteMany();
   await prisma.agentStep.deleteMany();
   await prisma.agentRun.deleteMany();
@@ -79,6 +80,7 @@ async function main() {
 
   const milestone = await prisma.milestone.create({
     data: {
+      organizationId: org.id,
       programId: program.id,
       title: "Week 4 - Working demo + short report",
       description: "Ship a working demo link and a short methods/results writeup.",
@@ -153,6 +155,7 @@ async function main() {
 
     await prisma.submission.create({
       data: {
+        organizationId: org.id,
         milestoneId: milestone.id,
         memberId: member.id,
         status,

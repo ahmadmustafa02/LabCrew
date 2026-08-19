@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getPrisma } from "@/lib/db";
+import { findInviteByJoinToken } from "@/server/tenancy/lab-repo";
 
 export const runtime = "nodejs";
+
+/**
+ * Public join endpoints — auth is the high-entropy invite token itself.
+ * There is no invite-by-id public lookup (that would be IDOR).
+ * Unknown / expired / accepted all return the same 404 shape.
+ */
 
 export async function GET(request: Request) {
   try {
@@ -11,15 +18,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: "token required" }, { status: 400 });
     }
 
-    const prisma = getPrisma();
-    const invite = await prisma.invite.findUnique({
-      where: { token },
-      include: {
-        program: { include: { organization: true } },
-      },
-    });
-
-    if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
+    const invite = await findInviteByJoinToken(token);
+    if (!invite) {
       return NextResponse.json(
         { ok: false, error: "Invite is invalid or expired" },
         { status: 404 },
@@ -71,26 +71,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const prisma = getPrisma();
-    const invite = await prisma.invite.findUnique({
-      where: { token },
-      include: { program: true },
-    });
-
-    if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
+    const invite = await findInviteByJoinToken(token);
+    if (!invite) {
       return NextResponse.json(
         { ok: false, error: "Invite is invalid or expired" },
         { status: 404 },
       );
     }
 
+    const prisma = getPrisma();
     const passwordHash = await bcrypt.hash(password, 10);
     const email = invite.email.toLowerCase();
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
       const already = await prisma.member.findFirst({
-        where: { programId: invite.programId, userId: existing.id },
+        where: {
+          programId: invite.programId,
+          organizationId: invite.organizationId,
+          userId: existing.id,
+        },
       });
       if (already) {
         return NextResponse.json(
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
         }),
         prisma.member.create({
           data: {
-            organizationId: invite.program.organizationId,
+            organizationId: invite.organizationId,
             programId: invite.programId,
             userId: existing.id,
             role: invite.role,
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
       });
       await tx.member.create({
         data: {
-          organizationId: invite.program.organizationId,
+          organizationId: invite.organizationId,
           programId: invite.programId,
           userId: user.id,
           role: invite.role,

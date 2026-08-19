@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { ApprovalStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import {
-  assertSameProgram,
-  requireDirector,
-} from "@/server/auth/api-session";
+import { requireLabDirector } from "@/server/tenancy/lab-scope";
+import { findApprovalInLab } from "@/server/tenancy/lab-repo";
 import { deliverNudge } from "@/server/email/deliver-nudge";
 
 export const runtime = "nodejs";
@@ -18,7 +16,7 @@ type Body = {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
     const { id } = await params;
@@ -32,14 +30,10 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
-    const prisma = getPrisma();
-    const existing = await prisma.approvalItem.findUnique({ where: { id } });
+    const existing = await findApprovalInLab(gate.ctx.labId, id);
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     }
-
-    const wrong = assertSameProgram(gate.session, existing.programId);
-    if (wrong) return wrong;
 
     if (existing.status !== ApprovalStatus.PENDING) {
       return NextResponse.json(
@@ -52,6 +46,8 @@ export async function PATCH(request: Request, { params }: Params) {
       typeof input.body === "string" && input.body.trim().length > 0
         ? input.body.trim()
         : existing.body;
+
+    const prisma = getPrisma();
 
     if (action === "save") {
       const updated = await prisma.approvalItem.update({

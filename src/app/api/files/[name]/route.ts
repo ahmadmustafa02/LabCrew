@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/db";
-import {
-  assertSameProgram,
-  requireAuth,
-} from "@/server/auth/api-session";
+import { requireLabScope } from "@/server/tenancy/lab-scope";
+import { findStoredFileInLab } from "@/server/tenancy/lab-repo";
 
 export const runtime = "nodejs";
 
 type Params = { params: Promise<{ name: string }> };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(request);
     if ("error" in gate) return gate.error;
 
     const { name } = await params;
@@ -19,14 +16,10 @@ export async function GET(_request: Request, { params }: Params) {
       return NextResponse.json({ ok: false, error: "Invalid file" }, { status: 400 });
     }
 
-    const prisma = getPrisma();
-    const file = await prisma.storedFile.findUnique({ where: { filename: name } });
+    const file = await findStoredFileInLab(gate.ctx.labId, name);
     if (!file) {
       return NextResponse.json({ ok: false, error: "File not found" }, { status: 404 });
     }
-
-    const wrong = assertSameProgram(gate.session, file.programId);
-    if (wrong) return wrong;
 
     return new NextResponse(new Uint8Array(file.data), {
       headers: {

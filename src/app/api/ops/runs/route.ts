@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { AgentRunStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import {
-  assertSameProgram,
-  requireAuth,
-  requireDirector,
-} from "@/server/auth/api-session";
+  inLab,
+  requireLabDirector,
+  requireLabScope,
+} from "@/server/tenancy/lab-scope";
 import { serializeAgentRun } from "@/server/ops/serialize-run";
 import { getOpsQueue } from "@/server/queue/ops-queue";
 
@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(request);
     if ("error" in gate) return gate.error;
 
     const { searchParams } = new URL(request.url);
@@ -25,14 +25,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const programId =
-      searchParams.get("programId") ?? gate.session.membership.programId;
-    const wrong = assertSameProgram(gate.session, programId);
-    if (wrong) return wrong;
-
+    // Never trust client programId — always use session membership.
+    const programId = gate.ctx.membership.programId;
     const prisma = getPrisma();
     const run = await prisma.agentRun.findFirst({
-      where: { programId },
+      where: { programId, ...inLab(gate.ctx.labId) },
       orderBy: { createdAt: "desc" },
       include: {
         steps: { orderBy: { sortOrder: "asc" } },
@@ -62,20 +59,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
-    const body = (await request.json().catch(() => ({}))) as {
-      programId?: string;
-    };
-
-    const programId = body.programId ?? gate.session.membership.programId;
-    const wrong = assertSameProgram(gate.session, programId);
-    if (wrong) return wrong;
+    // Ignore body.programId — session lab/program only.
+    const programId = gate.ctx.membership.programId;
+    const organizationId = gate.ctx.labId;
 
     const prisma = getPrisma();
     const run = await prisma.agentRun.create({
       data: {
+        organizationId,
         programId,
         status: AgentRunStatus.QUEUED,
         trigger: "manual",
@@ -85,6 +79,7 @@ export async function POST(request: Request) {
     await getOpsQueue().add(
       "weekly-ops",
       {
+        organizationId,
         programId,
         runId: run.id,
         trigger: "manual",
@@ -98,6 +93,7 @@ export async function POST(request: Request) {
         id: run.id,
         status: run.status,
         programId,
+        organizationId,
       },
     });
   } catch (error) {

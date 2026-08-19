@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
-import { requireAuth } from "@/server/auth/api-session";
+import { asApiSession, requireLabScope } from "@/server/tenancy/lab-scope";
 import {
   canAccessConversation,
   notifyNewMessage,
@@ -13,11 +13,11 @@ export async function GET(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(req);
     if ("error" in gate) return gate.error;
 
     const { id } = await ctx.params;
-    const conv = await canAccessConversation(id, gate.session);
+    const conv = await canAccessConversation(id, asApiSession(gate.ctx));
     if (!conv) {
       return NextResponse.json(
         { ok: false, error: "Conversation not found" },
@@ -32,9 +32,8 @@ export async function GET(
     const messages = await prisma.message.findMany({
       where: {
         conversationId: id,
-        ...(after
-          ? { createdAt: { gt: new Date(after) } }
-          : {}),
+        organizationId: gate.ctx.labId,
+        ...(after ? { createdAt: { gt: new Date(after) } } : {}),
       },
       include: { sender: { include: { user: true } } },
       orderBy: { createdAt: "asc" },
@@ -52,7 +51,7 @@ export async function GET(
         createdAt: m.createdAt.toISOString(),
         senderMemberId: m.senderMemberId,
         senderName: m.sender.user.name,
-        mine: m.senderMemberId === gate.session.membership.id,
+        mine: m.senderMemberId === gate.ctx.membership.id,
       })),
     });
   } catch (error) {
@@ -71,11 +70,11 @@ export async function POST(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(req);
     if ("error" in gate) return gate.error;
 
     const { id } = await ctx.params;
-    const conv = await canAccessConversation(id, gate.session);
+    const conv = await canAccessConversation(id, asApiSession(gate.ctx));
     if (!conv) {
       return NextResponse.json(
         { ok: false, error: "Conversation not found" },
@@ -102,8 +101,9 @@ export async function POST(
     const now = new Date();
     const message = await prisma.message.create({
       data: {
+        organizationId: gate.ctx.labId,
         conversationId: id,
-        senderMemberId: gate.session.membership.id,
+        senderMemberId: gate.ctx.membership.id,
         body: text,
         clientId: body.clientId?.slice(0, 64) || null,
       },
@@ -116,9 +116,10 @@ export async function POST(
     });
 
     void notifyNewMessage({
-      programId: gate.session.membership.programId,
+      organizationId: gate.ctx.labId,
+      programId: gate.ctx.membership.programId,
       conversationId: id,
-      senderMemberId: gate.session.membership.id,
+      senderMemberId: gate.ctx.membership.id,
       studentMemberId: conv.studentMemberId,
       preview: text,
     });

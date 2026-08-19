@@ -4,6 +4,8 @@ import { getRedisConnection } from "./connection";
 export const OPS_QUEUE_NAME = "labcrew-ops";
 
 export type WeeklyOpsJob = {
+  /** labId — required on weekly-ops jobs for worker re-validation */
+  organizationId?: string;
   programId: string;
   runId: string;
   trigger?: "manual" | "schedule";

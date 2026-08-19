@@ -1,7 +1,8 @@
 import { RsvpStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
-import { requireStudent } from "@/server/auth/api-session";
+import { requireLabStudent } from "@/server/tenancy/lab-scope";
+import { findMeetingInLab } from "@/server/tenancy/lab-repo";
 
 export const runtime = "nodejs";
 
@@ -10,7 +11,7 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> },
 ) {
   try {
-    const gate = await requireStudent();
+    const gate = await requireLabStudent(req);
     if ("error" in gate) return gate.error;
 
     const { id } = await ctx.params;
@@ -23,11 +24,20 @@ export async function PATCH(
       );
     }
 
+    const meeting = await findMeetingInLab(gate.ctx.labId, id);
+    if (!meeting) {
+      return NextResponse.json(
+        { ok: false, error: "Meeting invite not found" },
+        { status: 404 },
+      );
+    }
+
     const prisma = getPrisma();
     const invite = await prisma.meetingInvite.findFirst({
       where: {
         meetingId: id,
-        memberId: gate.session.membership.id,
+        memberId: gate.ctx.membership.id,
+        organizationId: gate.ctx.labId,
       },
     });
     if (!invite) {

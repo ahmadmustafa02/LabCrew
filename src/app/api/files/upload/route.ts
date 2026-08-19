@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     const prisma = getPrisma();
     await prisma.storedFile.create({
       data: {
+        organizationId: gate.session.membership.organizationId,
         programId: gate.session.membership.programId,
         filename,
         originalName: file.name,

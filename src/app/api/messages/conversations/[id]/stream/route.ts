@@ -1,4 +1,4 @@
-import { requireAuth } from "@/server/auth/api-session";
+import { asApiSession, requireLabScope } from "@/server/tenancy/lab-scope";
 import { getPrisma } from "@/lib/db";
 import { canAccessConversation } from "@/server/messages/access";
 
@@ -13,11 +13,11 @@ export async function GET(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireAuth();
+  const gate = await requireLabScope(req);
   if ("error" in gate) return gate.error;
 
   const { id } = await ctx.params;
-  const conv = await canAccessConversation(id, gate.session);
+  const conv = await canAccessConversation(id, asApiSession(gate.ctx));
   if (!conv) {
     return new Response("Not found", { status: 404 });
   }
@@ -28,6 +28,8 @@ export async function GET(
 
   const encoder = new TextEncoder();
   let closed = false;
+  const labId = gate.ctx.labId;
+  const myMemberId = gate.ctx.membership.id;
 
   const stream = new ReadableStream({
     start(controller) {
@@ -47,6 +49,7 @@ export async function GET(
           const messages = await prisma.message.findMany({
             where: {
               conversationId: id,
+              organizationId: labId,
               createdAt: { gt: new Date(cursor) },
             },
             include: { sender: { include: { user: true } } },
@@ -62,7 +65,7 @@ export async function GET(
               createdAt: m.createdAt.toISOString(),
               senderMemberId: m.senderMemberId,
               senderName: m.sender.user.name,
-              mine: m.senderMemberId === gate.session.membership.id,
+              mine: m.senderMemberId === myMemberId,
             });
           }
         } catch {
