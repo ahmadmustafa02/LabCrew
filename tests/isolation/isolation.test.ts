@@ -17,6 +17,7 @@ import {
   findConversationInLab,
   findDataPointsForMilestoneInLab,
   findDataPointsForSubmissionInLab,
+  findEngagementScoreInLab,
   findInviteByJoinToken,
   findInviteInLab,
   findMeetingInLab,
@@ -60,6 +61,7 @@ function printLab(label: string, lab: LabSlice) {
   log(`  inviteId:               ${lab.inviteId}`);
   log(`  inviteToken:            ${lab.inviteToken}`);
   log(`  dataPointId:            ${lab.dataPointId}`);
+  log(`  engagementScoreId:      ${lab.engagementScoreId}`);
 }
 
 async function assertSees(
@@ -148,6 +150,32 @@ describe("lab-repo: positive A→A and negative A↛B", () => {
     );
     assert.equal(flipped.length, 0, "B must not see A data points via A submissionId");
     log(`  PASS  - B cannot see A data points → blocked (empty)`);
+  });
+
+  it("engagement scores (Adaptive Coach Phase A)", async () => {
+    log("\n[engagementScore]");
+    await assertSees(
+      "A sees A engagement score",
+      await findEngagementScoreInLab(
+        fixture.labA.organizationId,
+        fixture.labA.engagementScoreId,
+      ),
+      fixture.labA.engagementScoreId,
+    );
+    await assertBlocked(
+      "A cannot see B engagement score",
+      await findEngagementScoreInLab(
+        fixture.labA.organizationId,
+        fixture.labB.engagementScoreId,
+      ),
+    );
+    await assertBlocked(
+      "B cannot see A engagement score",
+      await findEngagementScoreInLab(
+        fixture.labB.organizationId,
+        fixture.labA.engagementScoreId,
+      ),
+    );
   });
 
   it("student cohort view never includes peer raw rows (same lab)", async () => {

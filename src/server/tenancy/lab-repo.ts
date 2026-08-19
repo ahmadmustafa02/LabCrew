@@ -150,3 +150,12 @@ export async function findDataPointsForMilestoneInLab(
     },
   });
 }
+
+export async function findEngagementScoreInLab(
+  labId: string,
+  engagementScoreId: string,
+) {
+  return getPrisma().engagementScore.findFirst({
+    where: { id: engagementScoreId, ...inLab(labId) },
+  });
+}

@@ -93,6 +93,7 @@ model Organization {
   announcementRecipients AnnouncementRecipient[]
   opsSchedules           ProgramOpsSchedule[]
   apiAccessTokens        ApiAccessToken[]
+  engagementScores       EngagementScore[]
 }
 
 model Program {
@@ -115,6 +116,7 @@ model Program {
   announcements  Announcement[]
   opsSchedule    ProgramOpsSchedule?
   apiAccessTokens ApiAccessToken[]
+  engagementScores EngagementScore[]
 
   @@index([organizationId])
 }
@@ -189,6 +191,7 @@ model Member {
   createdAnnouncements Announcement[] @relation("AnnouncementCreator")
   announcementRecipients AnnouncementRecipient[]
   apiAccessTokens ApiAccessToken[]
+  engagementScores EngagementScore[]
 
   @@unique([programId, userId])
   @@index([organizationId])
@@ -300,9 +303,38 @@ model AgentRun {
   updatedAt      DateTime       @updatedAt
   steps          AgentStep[]
   approvals      ApprovalItem[]
+  engagementScores EngagementScore[]
 
   @@index([organizationId])
   @@index([programId, createdAt])
+}
+
+/// Per-student, per-week engagement heuristic (Adaptive Coach Phase A).
+/// Directors only — never expose peer scores on student APIs.
+model EngagementScore {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// Monday 00:00 UTC of the ISO week this score covers
+  weekStart      DateTime
+  /// Heuristic 0–100
+  score          Float
+  /// Weighted component breakdown (timeliness, overdue, revision, meeting, messaging)
+  components     Json
+  computedAt     DateTime     @default(now())
+  runId          String?
+  run            AgentRun?    @relation(fields: [runId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([memberId, weekStart])
+  @@index([organizationId])
+  @@index([programId, weekStart])
+  @@index([organizationId, weekStart])
 }
 
 model AgentStep {
