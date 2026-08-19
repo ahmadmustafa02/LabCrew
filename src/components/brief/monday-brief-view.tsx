@@ -19,6 +19,24 @@ type Brief = {
   runFinishedAt: string | null;
   briefing: string | null;
   agenda: string[];
+  dataSummary: {
+    milestoneTitle: string;
+    contributorCount: number;
+    cellCount: number;
+    flaggedCellCount: number;
+    line: string;
+    columns: Array<{
+      columnName: string;
+      sampleSize: number;
+      mean: number | null;
+      median: number | null;
+      outlierCheck: {
+        status: string;
+        minRequired: number;
+        flaggedCount: number;
+      };
+    }>;
+  } | null;
   stats: {
     onTrack: number;
     students: number;
@@ -182,6 +200,41 @@ export function MondayBriefView() {
               </div>
             ) : null}
           </section>
+
+          {brief.dataSummary ? (
+            <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5">
+              <p className="text-xs font-medium uppercase tracking-[0.06em] text-lc-muted">
+                Cohort data
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-lc-ink">
+                {brief.dataSummary.line}
+              </p>
+              {brief.dataSummary.columns.length > 0 ? (
+                <ul className="mt-3 space-y-1.5 text-sm text-lc-muted">
+                  {brief.dataSummary.columns.map((c) => (
+                    <li key={c.columnName}>
+                      <span className="font-medium text-lc-ink">
+                        {c.columnName}
+                      </span>
+                      {" · "}n={c.sampleSize}
+                      {" · "}mean{" "}
+                      {c.mean === null
+                        ? "—"
+                        : Number.isInteger(c.mean)
+                          ? c.mean
+                          : c.mean.toFixed(3)}
+                      {" · "}
+                      {c.outlierCheck.status === "insufficient_sample"
+                        ? `IQR pending (need ${c.outlierCheck.minRequired}+)`
+                        : c.outlierCheck.flaggedCount > 0
+                          ? `${c.outlierCheck.flaggedCount} flagged`
+                          : "no IQR flags"}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : null}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5">

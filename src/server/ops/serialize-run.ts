@@ -27,6 +27,25 @@ export function serializeAgentRun(run: {
     briefing?: string;
     agenda?: string[];
     pendingApprovals?: number;
+    dataSummary?: {
+      milestoneId: string;
+      milestoneTitle: string;
+      contributorCount: number;
+      cellCount: number;
+      flaggedCellCount: number;
+      line: string;
+      columns: Array<{
+        columnName: string;
+        sampleSize: number;
+        mean: number | null;
+        median: number | null;
+        outlierCheck: {
+          status: string;
+          minRequired: number;
+          flaggedCount: number;
+        };
+      }>;
+    } | null;
   };
   const referee = run.steps.find((s) => s.agent === "REFEREE");
   const refereePayload = (referee?.payload ?? {}) as {
@@ -42,6 +61,7 @@ export function serializeAgentRun(run: {
     briefing?: string;
     agenda?: string[];
     pendingApprovals?: number;
+    dataSummary?: typeof summary.dataSummary;
   };
 
   const complete = refereePayload.complete ?? 0;
@@ -49,6 +69,7 @@ export function serializeAgentRun(run: {
   const missing = refereePayload.missing ?? 0;
   const exceptions = refereePayload.exceptions ?? [];
   const draftCount = coachPayload.draftCount ?? run.approvals.length;
+  const dataSummary = summary.dataSummary ?? clerkPayload.dataSummary ?? null;
 
   return {
     id: run.id,
@@ -81,5 +102,6 @@ export function serializeAgentRun(run: {
     },
     briefing: summary.briefing ?? clerkPayload.briefing ?? null,
     agenda: summary.agenda ?? clerkPayload.agenda ?? [],
+    dataSummary,
   };
 }

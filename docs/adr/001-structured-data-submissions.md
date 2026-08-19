@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — Phase A (Collect) + Phase B (Clean) + Phase C (Visualize)
+Accepted — Phase A (Collect) + Phase B (Clean) + Phase C (Visualize) + Phase D (Analyze / Monday Brief)
 
 ## Context
 
@@ -42,9 +42,16 @@ Optional director schema lives on **`Milestone.dataSchema`**. Rubric: `acceptDat
 
 ### Small-cohort privacy
 
-**`STUDENT_AGGREGATE_MIN_N = 3`**. With 1–2 contributors, mean + own value can recover a classmate’s exact value. Below that threshold, student payload returns `status: insufficient_cohort` and **hides** mean/median (with an explicit message). Directors still see full cohort.
+**`STUDENT_AGGREGATE_MIN_N = 3`** — deliberate privacy floor, **independent of** `IQR_MIN_SAMPLE = 4`.
+
+- At **n=2**, mean + own value recovers the other student’s exact value → hide aggregates.
+- At **n=3**, mean is no longer a trivial 1:1 recovery of a single peer, but a student can still narrow the other two (especially if values cluster). That residual risk is **accepted** as a product tradeoff so small real labs still see cohort context once a third contributor appears — not “IQR−1”. Raising the floor later (e.g. 5) is an option if labs complain.
+
+## Analyze (Phase D)
+
+Clerk (weekly-ops agent) appends a **data-summary line** to the Monday Brief when the active milestone has `SubmissionDataPoint` rows: contributor count, cell count, flagged count, per-numeric-column mean + IQR status. Propagated to brief UI + Markdown/HTML export. No raw peer rows in the brief.
 
 ## Consequences
 
 - Isolation: Lab A ↛ Lab B cells; student filter ↛ peer raw rows (same lab).
-- Phase D Brief can aggregate without parsing files.
+- Monday Brief Clerk step includes data summary when structured cells exist.
