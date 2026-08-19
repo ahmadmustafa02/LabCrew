@@ -8,6 +8,7 @@ import type {
 } from "@/lib/assignment-types";
 import { groupCellsToTable, parseDataSchema } from "@/server/data/submission-data";
 import { draftResourceSuggestionsForMilestone } from "@/server/coach/resource-suggest";
+import { coachResourcesForStudent } from "@/server/coach/student-coach";
 import {
   requireLabDirector,
   requireLabScope,
@@ -91,8 +92,10 @@ export async function GET(request: Request, { params }: Params) {
         materials: assignment.materials,
         rubric: assignment.rubric,
         dataSchema: parseDataSchema(assignment.dataSchema),
-        // Approved reading list is director-visible until Phase D student UI ships.
-        coachResources: isDirector ? (assignment.coachResources ?? null) : null,
+        // Phase D: students see approved reading list only; directors always see stored JSON.
+        coachResources: isDirector
+          ? (assignment.coachResources ?? null)
+          : coachResourcesForStudent(assignment.coachResources),
         dueAt: assignment.dueAt,
         status: assignment.status,
         stats: {

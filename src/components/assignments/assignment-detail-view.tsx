@@ -66,6 +66,19 @@ type AssignmentDetail = {
   materials: MaterialItem[] | null;
   rubric: AssignmentRubric | null;
   dataSchema: AssignmentDataSchema | null;
+  coachResources?: {
+    status: "found" | "empty";
+    query: string;
+    note: string;
+    items: Array<{
+      title: string;
+      url: string;
+      year: number | null;
+      venue: string | null;
+      rationale: string;
+    }>;
+    approvedAt: string | null;
+  } | null;
   dueAt: string | null;
   status: string;
   stats: {
@@ -456,6 +469,45 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                   {m.title}
                 </a>
                 <span className="ml-2 text-xs text-lc-muted">{m.kind}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {role === "student" &&
+      assignment.coachResources?.status === "found" &&
+      (assignment.coachResources.items?.length ?? 0) > 0 ? (
+        <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5">
+          <h2 className="text-[15px] font-semibold text-lc-ink">
+            Suggested reading
+          </h2>
+          <p className="mt-1 text-sm text-lc-muted">
+            Director-approved papers for this assignment — open one when you need
+            a foothold, not as homework for its own sake.
+          </p>
+          <ul className="mt-3 space-y-3">
+            {assignment.coachResources.items.map((item) => (
+              <li
+                key={item.url}
+                className="rounded-[10px] border border-[var(--lc-line)] px-3 py-2.5"
+              >
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-medium text-lc-ink underline-offset-2 hover:underline"
+                >
+                  {item.title}
+                </a>
+                <p className="mt-0.5 text-xs text-lc-muted">
+                  {[item.venue, item.year].filter(Boolean).join(" · ")}
+                </p>
+                {item.rationale ? (
+                  <p className="mt-1 text-xs leading-relaxed text-lc-muted">
+                    {item.rationale}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>
