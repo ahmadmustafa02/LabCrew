@@ -12,17 +12,16 @@
 - **1b (blocking before Phase 2):** meetings / messages / invites / portal on `requireLabScope`; invite accept by join-token only (no id lookup); bearer rate limit + revoke API; verbose A/B + bearer cross-lab isolation tests
 - Follow-up: mark **Isolation** as a **required** status check on `master` (workflow present ≠ merge-blocking). Same CI gate for CodePulse.
 
-### Phase 2 — Pipeline degraded (not silent demo) — in progress
+### Phase 2 — Pipeline degraded (done)
 
 - Redis unreachable → block dispatch, show **degraded**
 - Worker down but Redis up → allow enqueue, show **queued, processing delayed**
-- No silent mock replay for authenticated ops
-- Ops enqueue rate limit (all auth methods); invite-accept rate limit
-- Worker Redis heartbeat for health probes
+- No silent mock replay; approvals load failure ≠ empty inbox
+- Ops enqueue + invite-accept rate limits; worker Redis heartbeat
 
-### Phase 3 — Installation blueprint
+### Phase 3 — Installation blueprint (in progress)
 
-- Harden one-command Compose + **ADMIN.md**
+- Harden one-command Compose + **ADMIN.md** + install scripts
 
 ### Phase 6 draft — System design docs (after 1–3)
 

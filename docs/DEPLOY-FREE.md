@@ -6,10 +6,14 @@ LabCrew runs fully offline on your machine with Docker. **$0**.
 
 ```bash
 cp .env.example .env
+# Windows: .\scripts\install.ps1
+# macOS/Linux: ./scripts/install.sh
 docker compose up --build
 ```
 
 Then open http://localhost:3000/signup
+
+Administrator documentation (env, backup, troubleshooting, security): **[ADMIN.md](../ADMIN.md)**
 
 - Postgres + Redis + web + worker included
 - Uploads stored **in Postgres** (survive restarts, no S3)

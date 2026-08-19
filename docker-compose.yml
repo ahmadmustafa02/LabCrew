@@ -1,18 +1,30 @@
+# LabCrew — one-command local / self-host stack
+# Usage:
+#   cp .env.example .env
+#   # set a strong AUTH_SECRET before any real deploy
+#   docker compose up --build
+#
+# Host ports: web 3000 · Postgres 5434 · Redis 6380
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: labcrew-postgres
     restart: unless-stopped
     ports:
-      - "5434:5432"
+      - "${POSTGRES_HOST_PORT:-5434}:5432"
     environment:
-      POSTGRES_USER: labcrew
-      POSTGRES_PASSWORD: labcrew
-      POSTGRES_DB: labcrew
+      POSTGRES_USER: ${POSTGRES_USER:-labcrew}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labcrew}
+      POSTGRES_DB: ${POSTGRES_DB:-labcrew}
     volumes:
       - labcrew_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U labcrew -d labcrew"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-labcrew} -d ${POSTGRES_DB:-labcrew}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,7 +34,7 @@ services:
     container_name: labcrew-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "${REDIS_HOST_PORT:-6380}:6379"
     volumes:
       - labcrew_redis_data:/data
     healthcheck:
@@ -37,7 +49,7 @@ services:
       target: worker
     container_name: labcrew-migrate
     environment:
-      DATABASE_URL: postgresql://labcrew:labcrew@postgres:5432/labcrew?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-labcrew}:${POSTGRES_PASSWORD:-labcrew}@postgres:5432/${POSTGRES_DB:-labcrew}?schema=public
     command: sh -c "npx prisma migrate deploy || npx prisma db push; npx tsx prisma/seed.ts"
     depends_on:
       postgres:
@@ -51,9 +63,9 @@ services:
     container_name: labcrew-web
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${WEB_HOST_PORT:-3000}:3000"
     environment:
-      DATABASE_URL: postgresql://labcrew:labcrew@postgres:5432/labcrew?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-labcrew}:${POSTGRES_PASSWORD:-labcrew}@postgres:5432/${POSTGRES_DB:-labcrew}?schema=public
       REDIS_URL: redis://redis:6379
       AUTH_SECRET: ${AUTH_SECRET:-labcrew-dev-secret-change-me}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
@@ -64,11 +76,26 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       EMAIL_FROM: ${EMAIL_FROM:-LabCrew <ops@labcrew.local>}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_MODEL: ${LLM_MODEL:-llama-3.1-8b-instant}
     depends_on:
       migrate:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
 
   worker:
     build:
@@ -77,11 +104,16 @@ services:
     container_name: labcrew-worker
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://labcrew:labcrew@postgres:5432/labcrew?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-labcrew}:${POSTGRES_PASSWORD:-labcrew}@postgres:5432/${POSTGRES_DB:-labcrew}?schema=public
       REDIS_URL: redis://redis:6379
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_MODEL: ${LLM_MODEL:-llama-3.1-8b-instant}
     depends_on:
       migrate:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
