@@ -2,13 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  MOCK_EXCEPTIONS,
   MOCK_RUN,
-  MOCK_STATS,
   type MockStep,
   type StepStatus,
 } from "@/lib/mock-data";
-import { useOpsRunReplay } from "@/hooks/use-ops-run-replay";
 
 type LiveException = {
   name: string;
@@ -16,7 +13,8 @@ type LiveException = {
   severity: string;
 };
 
-type LiveMode = "live" | "demo";
+/** Pipeline connectivity — never silently falls back to demo replay. */
+export type PipelineStatus = "ok" | "degraded" | "delayed" | "unknown";
 
 type RunStats = {
   onTrack: number;
@@ -62,9 +60,8 @@ const IDLE_STEPS: MockStep[] = MOCK_RUN.steps.map((s) => ({
 }));
 
 export function useLiveOpsRun() {
-  const demo = useOpsRunReplay();
-  /** null until first bootstrap finishes — UI must not paint demo then live */
-  const [mode, setMode] = useState<LiveMode | null>(null);
+  const [ready, setReady] = useState(false);
+  const [pipeline, setPipeline] = useState<PipelineStatus>("unknown");
   const [programId, setProgramId] = useState<string | null>(null);
   const [programLabel, setProgramLabel] = useState("");
   const [liveBusy, setLiveBusy] = useState(false);
@@ -81,8 +78,7 @@ export function useLiveOpsRun() {
   const [error, setError] = useState<string | null>(null);
   const [hasRun, setHasRun] = useState(false);
   const pollRef = useRef<number | null>(null);
-
-  const ready = mode !== null;
+  const healthRef = useRef<number | null>(null);
 
   const stopPoll = useCallback(() => {
     if (pollRef.current != null) {
@@ -91,7 +87,37 @@ export function useLiveOpsRun() {
     }
   }, []);
 
-  useEffect(() => () => stopPoll(), [stopPoll]);
+  const refreshHealth = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ops/health");
+      const data = await res.json();
+      const h = data.health;
+      if (!data.ok || !h) {
+        setPipeline("degraded");
+        return { canEnqueue: false, processingDelayed: false, degraded: true };
+      }
+      if (h.degraded) {
+        setPipeline("degraded");
+      } else if (h.processingDelayed) {
+        setPipeline("delayed");
+      } else {
+        setPipeline("ok");
+      }
+      return h as {
+        canEnqueue: boolean;
+        processingDelayed: boolean;
+        degraded: boolean;
+      };
+    } catch {
+      setPipeline("degraded");
+      return { canEnqueue: false, processingDelayed: false, degraded: true };
+    }
+  }, []);
+
+  useEffect(() => () => {
+    stopPoll();
+    if (healthRef.current != null) window.clearInterval(healthRef.current);
+  }, [stopPoll]);
 
   const applyLivePayload = useCallback(
     (run: {
@@ -170,21 +196,21 @@ export function useLiveOpsRun() {
     let cancelled = false;
     (async () => {
       try {
+        await refreshHealth();
         const res = await fetch("/api/demo/program");
         const data = await res.json();
         if (cancelled) return;
 
         if (!data.ok) {
-          setMode("demo");
+          setError(data.error ?? "Could not load program");
+          setReady(true);
           return;
         }
 
         setProgramId(data.program.id);
         setProgramLabel(data.program.name);
 
-        const latestRes = await fetch(
-          `/api/ops/runs?latest=1&programId=${encodeURIComponent(data.program.id)}`,
-        );
+        const latestRes = await fetch("/api/ops/runs?latest=1");
         const latest = await latestRes.json();
         if (cancelled) return;
 
@@ -195,22 +221,36 @@ export function useLiveOpsRun() {
             pollRun(latest.run.id);
           }
         }
-
-        setMode("live");
-      } catch {
-        if (!cancelled) setMode("demo");
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Ops unavailable");
+          setPipeline("degraded");
+        }
+      } finally {
+        if (!cancelled) setReady(true);
       }
     })();
+
+    healthRef.current = window.setInterval(() => {
+      void refreshHealth();
+    }, 20_000);
+
     return () => {
       cancelled = true;
     };
-  }, [applyLivePayload, pollRun]);
+  }, [applyLivePayload, pollRun, refreshHealth]);
+
+  const canDispatch = pipeline === "ok" || pipeline === "delayed";
 
   const start = useCallback(async () => {
     setError(null);
+    const health = await refreshHealth();
 
-    if (mode !== "live") {
-      demo.start();
+    if (health.degraded || !health.canEnqueue) {
+      setError(
+        "Ops pipeline degraded — Redis is unreachable. Dispatch is disabled until Redis is back.",
+      );
+      setLiveBusy(false);
       return;
     }
 
@@ -233,14 +273,18 @@ export function useLiveOpsRun() {
       }
 
       setLiveRunId(data.run.id);
+      if (data.processingDelayed || health.processingDelayed) {
+        setPipeline("delayed");
+      }
       pollRun(data.run.id);
     } catch (err) {
       setLiveBusy(false);
+      setLiveBadge("idle");
       setError(err instanceof Error ? err.message : "Live ops unavailable");
-      demo.start();
-      setMode("demo");
+      // Do NOT fall back to silent demo replay.
+      await refreshHealth();
     }
-  }, [demo, mode, pollRun, programId]);
+  }, [pollRun, programId, refreshHealth]);
 
   const liveStatCards = [
     {
@@ -269,55 +313,20 @@ export function useLiveOpsRun() {
     },
   ];
 
-  if (!ready) {
-    return {
-      ready: false as const,
-      mode: null,
-      programLabel: "",
-      steps: IDLE_STEPS,
-      badge: "idle" as const,
-      busy: false,
-      runId: "—",
-      showExceptions: false,
-      exceptions: [] as LiveException[],
-      briefing: null as string | null,
-      error: null as string | null,
-      statCards: [] as typeof liveStatCards,
-      start,
-    };
-  }
-
-  if (mode === "live") {
-    return {
-      ready: true as const,
-      mode,
-      programLabel,
-      steps: liveSteps,
-      badge: liveBadge,
-      busy: liveBusy,
-      runId: liveRunId,
-      showExceptions,
-      exceptions: liveExceptions,
-      briefing,
-      error,
-      statCards: liveStatCards,
-      start,
-    };
-  }
-
   return {
-    ready: true as const,
-    mode,
-    programLabel: "Demo lab",
-    steps: demo.steps,
-    badge: demo.badge,
-    busy: demo.busy,
-    runId: demo.runId,
-    showExceptions: demo.showExceptions,
-    exceptions: MOCK_EXCEPTIONS,
-    briefing: null,
+    ready,
+    pipeline,
+    canDispatch,
+    programLabel,
+    steps: liveSteps,
+    badge: liveBadge,
+    busy: liveBusy,
+    runId: liveRunId,
+    showExceptions,
+    exceptions: liveExceptions,
+    briefing,
     error,
-    statCards: MOCK_STATS,
+    statCards: liveStatCards,
     start,
   };
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getPrisma } from "@/lib/db";
+import { checkRateLimit } from "@/server/http/rate-limit";
 import { findInviteByJoinToken } from "@/server/tenancy/lab-repo";
 
 export const runtime = "nodejs";
@@ -11,8 +12,23 @@ export const runtime = "nodejs";
  * Unknown / expired / accepted all return the same 404 shape.
  */
 
+function clientKey(request: Request) {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    "unknown"
+  );
+}
+
 export async function GET(request: Request) {
   try {
+    const limited = checkRateLimit({
+      key: `invite-accept:${clientKey(request)}`,
+      max: 30,
+      windowMs: 60_000,
+    });
+    if (limited) return limited;
+
     const token = new URL(request.url).searchParams.get("token")?.trim() ?? "";
     if (!token) {
       return NextResponse.json({ ok: false, error: "token required" }, { status: 400 });
@@ -49,6 +65,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const limited = checkRateLimit({
+      key: `invite-accept-post:${clientKey(request)}`,
+      max: 20,
+      windowMs: 60_000,
+    });
+    if (limited) return limited;
+
     const body = (await request.json()) as {
       token?: string;
       name?: string;

@@ -2,6 +2,7 @@ import "dotenv/config";
 import { Worker } from "bullmq";
 import { executeWeeklyOps } from "../agents/weekly-ops";
 import { enqueueDueScheduledRuns } from "../ops/schedule-tick";
+import { touchWorkerHeartbeat } from "../ops/health";
 import { getPrisma } from "../../lib/db";
 import { getRedisConnection } from "../queue/connection";
 import {
@@ -18,6 +19,8 @@ type JobData = WeeklyOpsJob;
 const worker = new Worker<JobData>(
   OPS_QUEUE_NAME,
   async (job) => {
+    await touchWorkerHeartbeat().catch(() => undefined);
+
     if (job.name === SCHEDULE_TICK || job.data.kind === "schedule-tick") {
       const result = await enqueueDueScheduledRuns();
       console.log(
@@ -54,11 +57,17 @@ const worker = new Worker<JobData>(
 
 worker.on("ready", () => {
   console.log(`[ops-worker] listening on queue "${OPS_QUEUE_NAME}"`);
+  void touchWorkerHeartbeat().catch(() => undefined);
 });
 
 worker.on("failed", (job, error) => {
   console.error(`[ops-worker] failed job=${job?.id}`, error);
 });
+
+/** Keep heartbeat fresh even when the queue is idle. */
+const heartbeatTimer = setInterval(() => {
+  void touchWorkerHeartbeat().catch(() => undefined);
+}, 30_000);
 
 async function ensureScheduleTick() {
   const queue = getOpsQueue();
@@ -83,6 +92,7 @@ void ensureScheduleTick().catch((err) => {
 
 async function shutdown() {
   console.log("[ops-worker] shutting down");
+  clearInterval(heartbeatTimer);
   await worker.close();
   process.exit(0);
 }
