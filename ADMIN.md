@@ -1,7 +1,7 @@
 # LabCrew administrator documentation
 
 This is the day-2 ops bible for installing and running LabCrew.  
-Quickstart only: [README.md](./README.md) · free-host notes: [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) · tenancy: [docs/TENANCY.md](./docs/TENANCY.md)
+Quickstart only: [README.md](./README.md) · free-host notes: [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) · tenancy: [docs/TENANCY.md](./docs/TENANCY.md) · system design: [docs/SYSTEM.md](./docs/SYSTEM.md)
 
 ---
 

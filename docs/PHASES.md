@@ -4,26 +4,33 @@
 
 - Platform shell, agent runtime, director loop, Auth.js, Docker Compose
 
-## Upgrade track (approved)
+## Upgrade track
 
-### Phase 1 — Multi-tenancy hardening (in progress)
+### Phase 1 — Multi-tenancy hardening (done)
 
-- **1a:** `organizationId` (= labId); `requireLabScope` + `find*InLab` (no middleware); bearer tokens; high-risk ID routes; isolation suite + CI workflow
-- **1b (blocking before Phase 2):** meetings / messages / invites / portal on `requireLabScope`; invite accept by join-token only (no id lookup); bearer rate limit + revoke API; verbose A/B + bearer cross-lab isolation tests
-- Follow-up: mark **Isolation** as a **required** status check on `master` (workflow present ≠ merge-blocking). Same CI gate for CodePulse.
+- `organizationId` (= labId); `requireLabScope` + `find*InLab` (no middleware); bearer tokens; isolation suite + required CI on `master`
+- Meetings / messages / invites on lab scope; invite accept by join-token only
 
 ### Phase 2 — Pipeline degraded (done)
 
 - Redis unreachable → block dispatch, show **degraded**
-- Worker down but Redis up → allow enqueue, show **queued, processing delayed**
+- Worker down but Redis up → allow enqueue, show **delayed**
 - No silent mock replay; approvals load failure ≠ empty inbox
-- Ops enqueue + invite-accept rate limits; worker Redis heartbeat
 
-### Phase 3 — Installation blueprint (in progress)
+### Phase 3 — Installation blueprint (done)
 
-- Harden one-command Compose + **ADMIN.md** + install scripts
+- Hardened Compose + **ADMIN.md** + install scripts
 
-### Phase 6 draft — System design docs (after 1–3)
+### Structured data A–D (done)
+
+- **A** Collect → **B** Clean → **C** Visualize → **D** Monday Brief (Clerk)
+- ADR: [adr/001-structured-data-submissions.md](./adr/001-structured-data-submissions.md)
+- Verify: `npm run verify:phase-b|c|d`
+
+### Phase 6 draft — System design docs (in progress)
+
+- Index: [SYSTEM.md](./SYSTEM.md) (tenancy + ops + data pipeline)
+- Finalize after Phase 4/5 land
 
 ### Phase 4 ∥ 5 — Flutter offline companion + recommender / persuasive UI
 
