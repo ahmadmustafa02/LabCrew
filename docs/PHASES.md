@@ -21,13 +21,13 @@
 
 - Hardened Compose + **ADMIN.md** + install scripts
 
-### Structured data A–D (done)
+### Structured data A-D (done)
 
-- **A** Collect → **B** Clean → **C** Visualize → **D** Monday Brief (Clerk)
+- **A** Collect -> **B** Clean -> **C** Visualize -> **D** Monday Brief (Clerk)
 - ADR: [adr/001-structured-data-submissions.md](./adr/001-structured-data-submissions.md)
-- Verify: `npm run verify:phase-b|c|d`
+- Verify: `npm run verify:phase-b|c|d` and `verify:brief-privacy` (Brief means gated below n=3)
 
-### Phase 6 draft — System design docs (in progress)
+### Phase 6 draft -- System design docs (in progress)
 
 - Index: [SYSTEM.md](./SYSTEM.md) (tenancy + ops + data pipeline)
 - Finalize after Phase 4/5 land
