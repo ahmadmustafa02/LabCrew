@@ -21,7 +21,10 @@ type Approval = {
 
 export function ApprovalsView() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
-  const [source, setSource] = useState<"live" | "loading">("loading");
+  /** live = API ok; unavailable = load failed (must not look like empty inbox) */
+  const [source, setSource] = useState<"live" | "unavailable" | "loading">(
+    "loading",
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftBody, setDraftBody] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -39,12 +42,12 @@ export function ApprovalsView() {
         return;
       }
       setApprovals([]);
-      setSource("live");
+      setSource("unavailable");
       setError(data.error ?? "Could not load approvals");
     } catch {
       setApprovals([]);
-      setSource("live");
-      setError("Could not load approvals");
+      setSource("unavailable");
+      setError("Could not load approvals — check your connection and try again");
     }
   }, []);
 
@@ -167,7 +170,29 @@ export function ApprovalsView() {
         ready={source !== "loading"}
         skeleton={<CardListSkeleton count={3} />}
       >
-      {approvals.length === 0 ? (
+      {source === "unavailable" ? (
+        <div
+          role="alert"
+          className="rounded-[16px] border border-[var(--lc-danger)]/30 bg-[var(--lc-danger-soft)] px-5 py-10 text-sm text-lc-danger"
+        >
+          <p className="font-medium">Approvals unavailable</p>
+          <p className="mt-2 opacity-90">
+            Could not load pending drafts. This is not an empty inbox — refresh
+            or check the API / database connection.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-4"
+            onClick={() => {
+              setSource("loading");
+              void load();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      ) : approvals.length === 0 ? (
         <div className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-10 text-sm text-lc-muted">
           No pending drafts. Run weekly ops from Mission Control when the cohort
           needs attention.

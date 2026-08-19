@@ -36,8 +36,7 @@
 
 Isolation suite includes **bearer-authenticated** Lab A tokens attempting Lab B resource IDs (separate from session path).
 
-## Phase status
+## Follow-ups (do not drop)
 
-- **1a done:** schema + helpers + high-risk ID routes + isolation scaffold
-- **1b done (blocking):** meetings / messages / invites / portal on `requireLabScope`; invite accept by join-token only; bearer rate limit + revoke; verbose A/B + bearer cross-lab tests
-- **Still open:** mark GitHub **required status check** for workflow job `Lab A/B isolation suite` on `master` (workflow file alone does not block merges); remaining demos/analytics/announcements audit; CodePulse CI gate follow-up
+- Invite join-token entropy in **production** is already `randomBytes(24)` (192 bits). Isolation **test** tokens use a weaker `inv_…` pattern — keep them test-only. Optional: rate-limit + document entropy in ADMIN.md.
+- Session rate limit on ops enqueue: done in Phase 2 (120/60s per user).

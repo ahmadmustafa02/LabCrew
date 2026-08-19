@@ -203,6 +203,7 @@ export function useLiveOpsRun() {
 
         if (!data.ok) {
           setError(data.error ?? "Could not load program");
+          setPipeline("degraded");
           setReady(true);
           return;
         }
@@ -214,7 +215,10 @@ export function useLiveOpsRun() {
         const latest = await latestRes.json();
         if (cancelled) return;
 
-        if (latest.ok && latest.run) {
+        if (!latest.ok) {
+          setError(latest.error ?? "Could not load latest ops run");
+          // Keep pipeline from health probe — do not pretend we have a clean idle run.
+        } else if (latest.run) {
           applyLivePayload(latest.run);
           const status = String(latest.run.status).toUpperCase();
           if (status === "RUNNING" || status === "QUEUED") {
