@@ -6,6 +6,15 @@ type BriefExportInput = {
   submissionRate: number;
   briefing: string | null;
   agenda: string[];
+  dataSummary?: {
+    line: string;
+    columns: Array<{
+      columnName: string;
+      sampleSize: number;
+      mean: number | null;
+      outlierCheck: { status: string; minRequired: number; flaggedCount: number };
+    }>;
+  } | null;
   stats: {
     onTrack: number;
     students: number;
@@ -44,6 +53,26 @@ export function briefToMarkdown(b: BriefExportInput) {
       `- Draft nudges: ${b.stats.draftNudges}`,
       "",
     );
+  }
+
+  if (b.dataSummary?.line) {
+    lines.push("## Cohort data", "", b.dataSummary.line, "");
+    for (const c of b.dataSummary.columns) {
+      const flag =
+        c.outlierCheck.status === "insufficient_sample"
+          ? `IQR pending (need ${c.outlierCheck.minRequired}+)`
+          : c.outlierCheck.flaggedCount > 0
+            ? `${c.outlierCheck.flaggedCount} flagged`
+            : "no IQR flags";
+      const mean =
+        c.mean === null
+          ? "—"
+          : Number.isInteger(c.mean)
+            ? String(c.mean)
+            : c.mean.toFixed(3);
+      lines.push(`- **${c.columnName}**: n=${c.sampleSize}, mean=${mean}, ${flag}`);
+    }
+    lines.push("");
   }
 
   if (b.briefing) {

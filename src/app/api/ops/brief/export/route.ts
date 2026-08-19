@@ -70,6 +70,7 @@ async function loadBrief(programId: string) {
       students === 0 ? 0 : Math.round((turnedIn / students) * 100),
     briefing: serialized?.briefing ?? null,
     agenda: serialized?.agenda ?? [],
+    dataSummary: serialized?.dataSummary ?? null,
     stats: serialized?.stats ?? null,
     exceptions: (serialized?.exceptions ?? []).slice(0, 8),
     pendingApprovals,

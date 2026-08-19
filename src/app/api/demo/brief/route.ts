@@ -93,6 +93,7 @@ export async function GET() {
         runFinishedAt: latestRun?.finishedAt ?? latestRun?.createdAt ?? null,
         briefing: serialized?.briefing ?? null,
         agenda: serialized?.agenda ?? [],
+        dataSummary: serialized?.dataSummary ?? null,
         stats: serialized?.stats ?? null,
         exceptions: (serialized?.exceptions ?? []).slice(0, 5),
         pendingApprovals,

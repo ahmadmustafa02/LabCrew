@@ -16,7 +16,9 @@
     "test:isolation": "tsx --test tests/isolation/isolation.test.ts",
     "test:data": "tsx --test tests/data/*.test.ts",
     "test": "tsx --test tests/isolation/isolation.test.ts tests/data/*.test.ts",
-    "verify:phase-b": "tsx scripts/verify-phase-b.ts"
+    "verify:phase-b": "tsx scripts/verify-phase-b.ts",
+    "verify:phase-c": "tsx scripts/verify-phase-c.ts",
+    "verify:phase-d": "tsx scripts/verify-phase-d.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

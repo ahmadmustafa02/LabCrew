@@ -11,6 +11,10 @@ import {
 import { getPrisma } from "../../lib/db";
 import { draftNudge, scoreSubmission } from "./llm-scoring";
 import { llmConfigured } from "../llm/client";
+import {
+  appendDataLineToBriefing,
+  buildBriefDataSummary,
+} from "../data/brief-data-summary";
 
 const STEP_PAUSE_MS = 450;
 
@@ -308,11 +312,28 @@ export async function executeWeeklyOps(runId: string) {
         const exceptions = referee.exceptions ?? [];
         const names = exceptions.slice(0, 3).map((e) => e.name.split(" ")[0]);
 
-        const briefing =
+        const activeMilestone = await prisma.milestone.findFirst({
+          where: { programId, status: MilestoneStatus.ACTIVE },
+        });
+
+        let dataSummary: Awaited<ReturnType<typeof buildBriefDataSummary>> =
+          null;
+        if (activeMilestone) {
+          dataSummary = await buildBriefDataSummary({
+            labId: organizationId,
+            milestoneId: activeMilestone.id,
+            milestoneTitle: activeMilestone.title,
+          });
+        }
+
+        let briefing =
           pending === 0
             ? `${complete} students are on track for the active milestone. No exception packet this week — use standup for demos and questions.`
             : `${complete} on track, ${weak} weak, ${missing} missing. Focus Monday on ${names.join(", ") || "the exception list"}. ${pending} Coach draft${pending === 1 ? "" : "s"} wait in Approvals.`;
 
+        if (dataSummary?.line) {
+          briefing = appendDataLineToBriefing(briefing, dataSummary);
+        }
         const agenda =
           pending === 0
             ? [
@@ -326,9 +347,15 @@ export async function executeWeeklyOps(runId: string) {
                 "Confirm Week deliverable bar for everyone else",
               ];
 
+        if (dataSummary && dataSummary.flaggedCellCount > 0) {
+          agenda.push("Review flagged structured-data outliers on the assignment");
+        }
+
         const detail =
           pending === 0
-            ? "Cohort looks clear — no exception packet needed"
+            ? dataSummary
+              ? `Cohort looks clear · ${dataSummary.line}`
+              : "Cohort looks clear — no exception packet needed"
             : `Exception packet ready | ${pending} drafts awaiting director approval`;
 
         return {
@@ -340,6 +367,9 @@ export async function executeWeeklyOps(runId: string) {
             complete,
             weak,
             missing,
+            dataSummary: dataSummary
+              ? (dataSummary as unknown as Prisma.InputJsonValue)
+              : null,
           },
         };
       },
@@ -386,6 +416,7 @@ export async function executeWeeklyOps(runId: string) {
       briefing?: string;
       agenda?: string[];
       pendingApprovals?: number;
+      dataSummary?: unknown;
     };
 
     await prisma.agentRun.update({
@@ -399,6 +430,7 @@ export async function executeWeeklyOps(runId: string) {
           briefing: clerkPayload.briefing ?? null,
           agenda: clerkPayload.agenda ?? [],
           pendingApprovals: clerkPayload.pendingApprovals ?? 0,
+          dataSummary: clerkPayload.dataSummary ?? null,
         },
       },
     });
