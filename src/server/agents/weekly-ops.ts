@@ -15,6 +15,7 @@ import {
   appendDataLineToBriefing,
   buildBriefDataSummary,
 } from "../data/brief-data-summary";
+import { computeAndStoreEngagementScores } from "../coach/engagement-score";
 
 const STEP_PAUSE_MS = 450;
 
@@ -92,12 +93,21 @@ export async function executeWeeklyOps(runId: string) {
           include: { user: true },
         });
 
+        // Adaptive Coach Phase A — persist lab-scoped weekly engagement scores
+        const engagement = await computeAndStoreEngagementScores({
+          labId: organizationId,
+          programId,
+          runId,
+        });
+
         return {
-          detail: `${students} members | ${submissions} submissions | ${silent.length} missing active milestone`,
+          detail: `${students} members | ${submissions} submissions | ${silent.length} missing active milestone | engagement ${engagement.scored.length} scored`,
           payload: {
             students,
             submissions,
             missing: silent.map((m) => m.user.name),
+            engagementWeekStart: engagement.weekStart.toISOString(),
+            engagementScored: engagement.scored.length,
           },
         };
       },

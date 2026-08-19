@@ -37,6 +37,7 @@ export type LabSlice = {
   inviteId: string;
   inviteToken: string;
   dataPointId: string;
+  engagementScoreId: string;
 };
 
 export type IsolationFixture = {
@@ -266,6 +267,26 @@ export async function seedIsolationLabs(): Promise<{
       },
     });
 
+    const weekStart = new Date();
+    weekStart.setUTCHours(0, 0, 0, 0);
+    const day = (weekStart.getUTCDay() + 6) % 7;
+    weekStart.setUTCDate(weekStart.getUTCDate() - day);
+
+    const engagementScore = await prisma.engagementScore.create({
+      data: {
+        organizationId: org.id,
+        programId: program.id,
+        memberId: studentMember.id,
+        weekStart,
+        score: slug === "iso-lab-a" ? 42 : 88,
+        components: {
+          note: `secret-engagement-${slug}`,
+          timeliness: { weight: 30, score: 0.5, detail: "seed" },
+        },
+        runId: run.id,
+      },
+    });
+
     return {
       organizationId: org.id,
       programId: program.id,
@@ -288,6 +309,7 @@ export async function seedIsolationLabs(): Promise<{
       inviteId: invite.id,
       inviteToken: invite.token,
       dataPointId: dataPoint.id,
+      engagementScoreId: engagementScore.id,
     };
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SoftReveal } from "@/components/ui/soft-reveal";
 import { StatRowSkeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 type Analytics = {
   programName: string;
@@ -22,17 +23,47 @@ type Analytics = {
   }>;
 };
 
+type EngagementRow = {
+  id: string;
+  memberId: string;
+  name: string;
+  email: string;
+  score: number;
+  components: {
+    timeliness?: { detail?: string };
+    overdue?: { detail?: string };
+    revision?: { detail?: string; cycles?: number };
+    meeting?: { detail?: string };
+    messaging?: { detail?: string };
+  };
+  computedAt: string;
+};
+
 export function AnalyticsView() {
   const [data, setData] = useState<Analytics | null>(null);
+  const [engagement, setEngagement] = useState<{
+    weekStart: string;
+    scores: EngagementRow[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recomputing, setRecomputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function loadEngagement() {
+    const res = await fetch("/api/engagement");
+    const json = await res.json();
+    if (json.ok) {
+      setEngagement({ weekStart: json.weekStart, scores: json.scores });
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/demo/analytics");
-        const json = await res.json();
+        const analyticsRes = await fetch("/api/demo/analytics");
+        await loadEngagement().catch(() => null);
+        const json = await analyticsRes.json();
         if (!cancelled) {
           if (json.ok) setData(json.analytics);
           else setError(json.error ?? "Unavailable");
@@ -47,6 +78,20 @@ export function AnalyticsView() {
       cancelled = true;
     };
   }, []);
+
+  async function onRecompute() {
+    setRecomputing(true);
+    try {
+      const res = await fetch("/api/engagement", { method: "POST" });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error ?? "Recompute failed");
+      await loadEngagement();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Recompute failed");
+    } finally {
+      setRecomputing(false);
+    }
+  }
 
   const cards = data
     ? [
@@ -99,9 +144,9 @@ export function AnalyticsView() {
           </div>
         }
       >
-      <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(cards ?? []).map((row) => (
+        <div className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(cards ?? []).map((row) => (
               <div
                 key={row.label}
                 className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5"
@@ -113,44 +158,109 @@ export function AnalyticsView() {
                 <p className="mt-2 text-sm text-lc-muted">{row.note}</p>
               </div>
             ))}
-      </div>
+          </div>
 
-      <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface">
-        <div className="border-b border-[var(--lc-line)] px-5 py-4">
-          <h2 className="text-[15px] font-semibold text-lc-ink">Recent ops runs</h2>
-          <p className="mt-0.5 text-xs text-lc-muted">
-            From Postgres agent_run history
-          </p>
-        </div>
-        {!data?.recentRuns?.length ? (
-          <p className="px-5 py-8 text-sm text-lc-muted">
-            No runs yet. Trigger weekly ops from Mission Control.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[var(--lc-line)]">
-            {data.recentRuns.map((run) => (
-              <li
-                key={run.id}
-                className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5"
+          <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--lc-line)] px-5 py-4">
+              <div>
+                <h2 className="text-[15px] font-semibold text-lc-ink">
+                  Engagement scores
+                </h2>
+                <p className="mt-0.5 text-xs text-lc-muted">
+                  Director-only weekly heuristic (timeliness, overdue, revisions,
+                  RSVP, message reply). Peers never see this.
+                  {engagement?.weekStart
+                    ? ` Week of ${new Date(engagement.weekStart).toLocaleDateString()}.`
+                    : ""}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={recomputing}
+                onClick={onRecompute}
               >
-                <div>
-                  <p className="font-mono text-xs text-lc-muted">{run.id}</p>
-                  <p className="mt-1 text-sm text-lc-ink">
-                    {new Date(run.createdAt).toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-lc-ink">{run.status}</p>
-                  <p className="mt-1 text-xs text-lc-muted">
-                    {run.durationSec != null ? `${run.durationSec}s` : "—"}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      </div>
+                {recomputing ? "Scoring…" : "Recompute"}
+              </Button>
+            </div>
+            {!engagement?.scores?.length ? (
+              <p className="px-5 py-8 text-sm text-lc-muted">
+                No scores yet. Run weekly ops (Pulse) or click Recompute.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[var(--lc-line)]">
+                {engagement.scores.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex flex-wrap items-start justify-between gap-3 px-5 py-3.5"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-lc-ink">
+                        {row.name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-lc-muted">{row.email}</p>
+                      <p className="mt-2 max-w-lg text-xs leading-relaxed text-lc-muted">
+                        {[
+                          row.components?.timeliness?.detail,
+                          row.components?.overdue?.detail,
+                          row.components?.revision?.detail,
+                          row.components?.meeting?.detail,
+                          row.components?.messaging?.detail,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                    <p className="text-2xl font-semibold tabular-nums tracking-tight text-lc-ink">
+                      {row.score}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface">
+            <div className="border-b border-[var(--lc-line)] px-5 py-4">
+              <h2 className="text-[15px] font-semibold text-lc-ink">
+                Recent ops runs
+              </h2>
+              <p className="mt-0.5 text-xs text-lc-muted">
+                From Postgres agent_run history
+              </p>
+            </div>
+            {!data?.recentRuns?.length ? (
+              <p className="px-5 py-8 text-sm text-lc-muted">
+                No runs yet. Trigger weekly ops from Mission Control.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[var(--lc-line)]">
+                {data.recentRuns.map((run) => (
+                  <li
+                    key={run.id}
+                    className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5"
+                  >
+                    <div>
+                      <p className="font-mono text-xs text-lc-muted">{run.id}</p>
+                      <p className="mt-1 text-sm text-lc-ink">
+                        {new Date(run.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-lc-ink">
+                        {run.status}
+                      </p>
+                      <p className="mt-1 text-xs text-lc-muted">
+                        {run.durationSec != null ? `${run.durationSec}s` : "—"}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       </SoftReveal>
     </div>
   );

@@ -32,10 +32,11 @@
 - Index: [SYSTEM.md](./SYSTEM.md) (tenancy + ops + data pipeline) -- tables/index shape approved; keep the Brief-privacy hotfix callout honest (do not scrub).
 - **Not** a diagrammed C4 pack yet -- that is explicitly Phase 6 finalize.
 
-### Phase 4 ∥ 5 — Flutter offline companion + recommender / persuasive UI
+### Phase 4 ∥ 5 — Flutter offline companion + Adaptive Coach
 
 - Conflict policy: server baseline; never silent discard of offline draft; user chooses keep mine / view theirs
 - Flutter in monorepo `apps/mobile`
+- **Adaptive Coach Phase A (engagement score):** lab-scoped per-student per-week heuristic; director Analytics only. ADR: [adr/002-adaptive-coach.md](./adr/002-adaptive-coach.md). Verify: `npm run verify:phase-5a`
 
 ### Phase 6 finalize
 
