@@ -8,6 +8,7 @@ import type {
 } from "@/lib/assignment-types";
 import { requireAuth, requireDirector } from "@/server/auth/api-session";
 import { parseDataSchema } from "@/server/data/submission-data";
+import { draftResourceSuggestionsForMilestone } from "@/server/coach/resource-suggest";
 
 export const runtime = "nodejs";
 
@@ -148,7 +149,25 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ ok: true, assignment });
+    // Phase C — retrieval-grounded resource draft → Approvals (never invents)
+    let resourceDraft: { approvalId: string; status: string } | null = null;
+    try {
+      const drafted = await draftResourceSuggestionsForMilestone({
+        labId: organizationId,
+        programId,
+        milestoneId: assignment.id,
+        title: assignment.title,
+        description: assignment.description,
+      });
+      resourceDraft = {
+        approvalId: drafted.approvalId,
+        status: drafted.payload.status,
+      };
+    } catch (err) {
+      console.warn("[resources] draft on create failed", err);
+    }
+
+    return NextResponse.json({ ok: true, assignment, resourceDraft });
   } catch (error) {
     return NextResponse.json(
       {

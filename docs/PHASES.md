@@ -37,6 +37,8 @@
 - Conflict policy: server baseline; never silent discard of offline draft; user chooses keep mine / view theirs
 - Flutter in monorepo `apps/mobile`
 - **Adaptive Coach Phase A (engagement score):** lab-scoped per-student per-week heuristic; director Analytics only. ADR: [adr/002-adaptive-coach.md](./adr/002-adaptive-coach.md). Verify: `npm run verify:phase-5a`
+- **Phase B (nudge personalization):** Coach reads score trend → warmer/earlier vs reinforce drafts in Approvals. Verify: `npm run verify:phase-5b`
+- **Phase C (resources):** Semantic Scholar → arXiv retrieval; LLM selects only from hits; Approvals gate; `Milestone.coachResources` on approve. Verify: `npm run verify:phase-5c`
 
 ### Phase 6 finalize
 

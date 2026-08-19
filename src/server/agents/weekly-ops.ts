@@ -9,13 +9,14 @@ import {
   SubmissionStatus,
 } from "@prisma/client";
 import { getPrisma } from "../../lib/db";
-import { draftNudge, scoreSubmission } from "./llm-scoring";
+import { draftNudge, draftPositiveReinforcement, scoreSubmission } from "./llm-scoring";
 import { llmConfigured } from "../llm/client";
 import {
   appendDataLineToBriefing,
   buildBriefDataSummary,
 } from "../data/brief-data-summary";
 import { computeAndStoreEngagementScores } from "../coach/engagement-score";
+import { loadEngagementProfiles } from "../coach/engagement-trend";
 
 const STEP_PAUSE_MS = 450;
 
@@ -253,19 +254,81 @@ export async function executeWeeklyOps(runId: string) {
         });
         const milestoneTitle = activeMilestone?.title ?? "this milestone";
 
+        const students = await prisma.member.findMany({
+          where: { programId, role: MemberRole.STUDENT },
+          include: { user: true },
+        });
+        const byEmail = new Map(
+          students.map((m) => [m.user.email.toLowerCase(), m]),
+        );
+        const byName = new Map(
+          students.map((m) => [m.user.name.toLowerCase(), m]),
+        );
+
+        const profiles = await loadEngagementProfiles({
+          labId: organizationId,
+          programId,
+          memberIds: students.map((s) => s.id),
+        });
+
         await prisma.approvalItem.deleteMany({
           where: { programId, status: ApprovalStatus.PENDING, kind: "nudge" },
         });
 
         let llmDrafts = 0;
+        const exceptionMemberIds = new Set<string>();
+
         for (const item of exceptions) {
+          const member =
+            (item.email
+              ? byEmail.get(item.email.toLowerCase())
+              : undefined) ?? byName.get(item.name.toLowerCase());
+          if (member) exceptionMemberIds.add(member.id);
+          const profile = member
+            ? profiles.get(member.id)
+            : undefined;
           const drafted = await draftNudge({
             studentName: item.name,
             reason: item.reason,
             severity: item.severity,
             milestoneTitle,
+            trend: profile?.trend,
+            coachHint: profile?.coachHint,
+            latestScore: profile?.latestScore,
           });
           if (drafted.source === "llm") llmDrafts += 1;
+
+          const label = profile?.label ?? "unknown · standard timing";
+          await prisma.approvalItem.create({
+            data: {
+              organizationId,
+              programId,
+              runId,
+              kind: "nudge",
+              title: `Nudge (${label}) - ${item.name}`,
+              body: drafted.body,
+              targetName: item.name,
+              targetEmail: item.email ?? member?.user.email ?? null,
+              status: ApprovalStatus.PENDING,
+            },
+          });
+        }
+
+        // Consistently strong students with no exception → positive reinforcement
+        let reinforceCount = 0;
+        for (const student of students) {
+          if (exceptionMemberIds.has(student.id)) continue;
+          const profile = profiles.get(student.id);
+          if (!profile || profile.trend !== "strong") continue;
+
+          const drafted = await draftPositiveReinforcement({
+            studentName: student.user.name,
+            milestoneTitle,
+            latestScore: profile.latestScore,
+            coachHint: profile.coachHint,
+          });
+          if (drafted.source === "llm") llmDrafts += 1;
+          reinforceCount += 1;
 
           await prisma.approvalItem.create({
             data: {
@@ -273,22 +336,25 @@ export async function executeWeeklyOps(runId: string) {
               programId,
               runId,
               kind: "nudge",
-              title: `Nudge - ${item.name}`,
+              title: `Nudge (${profile.label}) - ${student.user.name}`,
               body: drafted.body,
-              targetName: item.name,
-              targetEmail: item.email ?? null,
+              targetName: student.user.name,
+              targetEmail: student.user.email,
               status: ApprovalStatus.PENDING,
             },
           });
         }
 
+        const draftCount = exceptions.length + reinforceCount;
         const mode = llmConfigured()
-          ? `${llmDrafts}/${exceptions.length} LLM drafts`
+          ? `${llmDrafts}/${draftCount} LLM drafts`
           : "template drafts";
         return {
-          detail: `${exceptions.length} drafts ready for approval · ${mode}`,
+          detail: `${draftCount} drafts ready for approval (${exceptions.length} exception, ${reinforceCount} reinforce) · ${mode}`,
           payload: {
-            draftCount: exceptions.length,
+            draftCount,
+            exceptionDrafts: exceptions.length,
+            reinforceDrafts: reinforceCount,
             coachMode: llmConfigured() ? "llm" : "heuristic",
             llmDrafts,
           },
