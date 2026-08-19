@@ -27,10 +27,10 @@
 - ADR: [adr/001-structured-data-submissions.md](./adr/001-structured-data-submissions.md)
 - Verify: `npm run verify:phase-b|c|d` and `verify:brief-privacy` (Brief means gated below n=3)
 
-### Phase 6 draft -- System design docs (in progress)
+### Phase 6 draft -- System design docs (done as draft)
 
-- Index: [SYSTEM.md](./SYSTEM.md) (tenancy + ops + data pipeline)
-- Finalize after Phase 4/5 land
+- Index: [SYSTEM.md](./SYSTEM.md) (tenancy + ops + data pipeline) -- tables/index shape approved; keep the Brief-privacy hotfix callout honest (do not scrub).
+- **Not** a diagrammed C4 pack yet -- that is explicitly Phase 6 finalize.
 
 ### Phase 4 ∥ 5 — Flutter offline companion + recommender / persuasive UI
 
@@ -38,5 +38,12 @@
 - Flutter in monorepo `apps/mobile`
 
 ### Phase 6 finalize
+
+- After Phase 4/5 land: **add diagrams**, do not only append table rows.
+- Minimum visual set:
+  1. **C4 context** -- LabCrew vs directors / students / external deps
+  2. **C4 container** -- web, worker, Postgres, Redis
+  3. **Sequence** -- weekly ops pipeline (`POST /api/ops/runs` → BullMQ → Pulse→Referee→Coach→Clerk → Brief), matching SYSTEM §4
+- Mermaid (or equivalent) in `SYSTEM.md` or `docs/diagrams/` is enough; keep the index prose.
 
 ### Phase 7 — Usability study (human track, parallel)
