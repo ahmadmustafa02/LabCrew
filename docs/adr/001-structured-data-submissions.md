@@ -51,6 +51,8 @@ Optional director schema lives on **`Milestone.dataSchema`**. Rubric: `acceptDat
 
 Clerk (weekly-ops agent) appends a **data-summary line** to the Monday Brief when the active milestone has `SubmissionDataPoint` rows: contributor count, cell count, flagged count, per-numeric-column mean + IQR status. Propagated to brief UI + Markdown/HTML export. No raw peer rows in the brief.
 
+**Circulatable Brief uses the same privacy floors as the student cohort UI** (`STUDENT_AGGREGATE_MIN_N`, `IQR_MIN_SAMPLE`). Below the contributor floor the line says `aggregates hidden — insufficient data (N of 3 min contributors)` and **does not print means** — exports can leave the director’s screen.
+
 ## Consequences
 
 - Isolation: Lab A ↛ Lab B cells; student filter ↛ peer raw rows (same lab).

@@ -25,6 +25,7 @@ const dataSummary: BriefDataSummary = {
         minRequired: 4,
         flaggedCount: 1,
       },
+      aggregatesHidden: false,
     },
     {
       columnName: "hours",
@@ -36,6 +37,7 @@ const dataSummary: BriefDataSummary = {
         minRequired: 4,
         flaggedCount: 0,
       },
+      aggregatesHidden: false,
     },
   ],
   line: "Data (Week 6 — Growth assay results): 4 contributors · 12 cells · 1 flagged · od600 mean=0.451 (1 flagged) · hours mean=24 (clean)",
