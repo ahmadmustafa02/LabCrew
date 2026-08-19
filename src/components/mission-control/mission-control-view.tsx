@@ -6,7 +6,7 @@ import { MissionControlSkeleton } from "@/components/ui/skeleton";
 import { SoftReveal } from "@/components/ui/soft-reveal";
 import { OpsSchedulePanel } from "@/components/mission-control/ops-schedule-panel";
 import { useLiveOpsRun } from "@/hooks/use-live-ops-run";
-import { DEMO_PROGRAM, type StepStatus } from "@/lib/mock-data";
+import { type StepStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/cn";
 
 function statusStyles(status: StepStatus) {
@@ -28,10 +28,48 @@ function badgeCopy(badge: "idle" | "running" | "succeeded") {
   return "Idle";
 }
 
+function PipelineBanner({
+  pipeline,
+}: {
+  pipeline: "ok" | "degraded" | "delayed" | "unknown";
+}) {
+  if (pipeline === "ok" || pipeline === "unknown") return null;
+
+  if (pipeline === "degraded") {
+    return (
+      <div
+        role="status"
+        className="rounded-[14px] border border-[var(--lc-danger)]/30 bg-[var(--lc-danger-soft)] px-4 py-3 text-sm text-lc-danger"
+      >
+        <p className="font-medium">Pipeline degraded</p>
+        <p className="mt-1 text-[13px] opacity-90">
+          Redis is unreachable — weekly ops cannot be enqueued. Last known brief
+          and DB data remain readable. Restore Redis, then refresh.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="status"
+      className="rounded-[14px] border border-[var(--lc-warn)]/30 bg-[var(--lc-warn-soft)] px-4 py-3 text-sm text-lc-warn"
+    >
+      <p className="font-medium">Queued — processing delayed</p>
+      <p className="mt-1 text-[13px] opacity-90">
+        Redis is up, so dispatch still works. The worker heartbeat is stale —
+        jobs wait in the queue until the worker returns. This is expected when
+        the consumer is briefly offline.
+      </p>
+    </div>
+  );
+}
+
 export function MissionControlView() {
   const {
     ready,
-    mode,
+    pipeline,
+    canDispatch,
     programLabel,
     steps,
     badge,
@@ -45,9 +83,18 @@ export function MissionControlView() {
     start,
   } = useLiveOpsRun();
 
+  const pipelineLabel =
+    pipeline === "degraded"
+      ? "degraded"
+      : pipeline === "delayed"
+        ? "delayed"
+        : "live";
+
   return (
     <SoftReveal ready={ready} skeleton={<MissionControlSkeleton />}>
       <div className="space-y-8">
+        <PipelineBanner pipeline={pipeline} />
+
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm text-lc-muted">Mission Control</p>
@@ -55,10 +102,9 @@ export function MissionControlView() {
               Weekly ops
             </h1>
             <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-lc-muted">
-              {DEMO_PROGRAM.activeMilestone}.{" "}
-              {mode === "live"
-                ? `${programLabel} is connected — runs hit BullMQ + Postgres.`
-                : "Demo replay mode (start Docker + seed for live crew)."}
+              {programLabel
+                ? `${programLabel} — runs hit BullMQ + Postgres.`
+                : "Connect your lab program to dispatch the weekly crew."}
             </p>
             {error ? (
               <p className="mt-2 text-sm text-lc-danger">{error}</p>
@@ -68,10 +114,19 @@ export function MissionControlView() {
             variant="accent"
             size="lg"
             onClick={start}
-            disabled={busy}
+            disabled={busy || !canDispatch}
             className="shrink-0"
+            title={
+              !canDispatch
+                ? "Dispatch disabled while Redis is unreachable"
+                : undefined
+            }
           >
-            {busy ? "Crew running…" : "Run weekly ops"}
+            {busy
+              ? "Crew running…"
+              : !canDispatch
+                ? "Dispatch unavailable"
+                : "Run weekly ops"}
           </Button>
         </div>
 
@@ -100,8 +155,7 @@ export function MissionControlView() {
                   Agent timeline
                 </h2>
                 <p className="mt-0.5 font-mono text-xs text-lc-muted">
-                  {runId}
-                  {mode === "live" ? " · live" : " · demo"}
+                  {runId} · {pipelineLabel}
                 </p>
               </div>
               <span

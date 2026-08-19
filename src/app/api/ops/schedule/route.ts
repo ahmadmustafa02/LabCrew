@@ -28,7 +28,10 @@ export async function GET() {
 
     if (!schedule) {
       schedule = await prisma.programOpsSchedule.create({
-        data: { programId },
+        data: {
+          organizationId: gate.session.membership.organizationId,
+          programId,
+        },
       });
     }
 
@@ -89,6 +92,7 @@ export async function PUT(req: Request) {
     const schedule = await prisma.programOpsSchedule.upsert({
       where: { programId },
       create: {
+        organizationId: gate.session.membership.organizationId,
         programId,
         enabled: Boolean(body.enabled),
         dayOfWeek,

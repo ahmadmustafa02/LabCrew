@@ -35,6 +35,7 @@ export async function enqueueDueScheduledRuns(now = new Date()) {
   const prisma = getPrisma();
   const schedules = await prisma.programOpsSchedule.findMany({
     where: { enabled: true },
+    include: { program: true },
   });
 
   const enqueued: string[] = [];
@@ -49,8 +50,11 @@ export async function enqueueDueScheduledRuns(now = new Date()) {
       if (ageMs < 6 * 24 * 60 * 60 * 1000) continue;
     }
 
+    const organizationId = schedule.organizationId || schedule.program.organizationId;
+
     const run = await prisma.agentRun.create({
       data: {
+        organizationId,
         programId: schedule.programId,
         status: AgentRunStatus.QUEUED,
         trigger: "schedule",
@@ -60,6 +64,7 @@ export async function enqueueDueScheduledRuns(now = new Date()) {
     await getOpsQueue().add(
       "weekly-ops",
       {
+        organizationId,
         programId: schedule.programId,
         runId: run.id,
         trigger: "schedule",

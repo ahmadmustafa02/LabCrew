@@ -4,6 +4,12 @@ import { auth } from "@/auth";
 import type { AppRole } from "@/auth.config";
 import { getPrisma } from "@/lib/db";
 
+/**
+ * Legacy session helpers for routes not yet migrated to lab-scope.
+ * New / audited routes must use `requireLabScope` from `@/server/tenancy/lab-scope`
+ * (supports cookie session + Bearer tokens; injects labId).
+ */
+
 export type ApiMembership = {
   id: string;
   role: MemberRole;

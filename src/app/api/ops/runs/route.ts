@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
 import { AgentRunStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import {
-  assertSameProgram,
-  requireAuth,
-  requireDirector,
-} from "@/server/auth/api-session";
+import { checkRateLimit } from "@/server/http/rate-limit";
+import { probeOpsHealth } from "@/server/ops/health";
 import { serializeAgentRun } from "@/server/ops/serialize-run";
 import { getOpsQueue } from "@/server/queue/ops-queue";
+import {
+  inLab,
+  requireLabDirector,
+  requireLabScope,
+} from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(request);
     if ("error" in gate) return gate.error;
 
     const { searchParams } = new URL(request.url);
@@ -25,14 +27,10 @@ export async function GET(request: Request) {
       );
     }
 
-    const programId =
-      searchParams.get("programId") ?? gate.session.membership.programId;
-    const wrong = assertSameProgram(gate.session, programId);
-    if (wrong) return wrong;
-
+    const programId = gate.ctx.membership.programId;
     const prisma = getPrisma();
     const run = await prisma.agentRun.findFirst({
-      where: { programId },
+      where: { programId, ...inLab(gate.ctx.labId) },
       orderBy: { createdAt: "desc" },
       include: {
         steps: { orderBy: { sortOrder: "asc" } },
@@ -62,42 +60,79 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
-    const body = (await request.json().catch(() => ({}))) as {
-      programId?: string;
-    };
+    const limited = checkRateLimit({
+      key: `ops-enqueue:${gate.ctx.userId}`,
+      max: 120,
+      windowMs: 60_000,
+    });
+    if (limited) return limited;
 
-    const programId = body.programId ?? gate.session.membership.programId;
-    const wrong = assertSameProgram(gate.session, programId);
-    if (wrong) return wrong;
+    const health = await probeOpsHealth();
+    if (!health.canEnqueue) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Ops pipeline degraded — Redis is unreachable. Cannot enqueue weekly ops.",
+          code: "REDIS_UNAVAILABLE",
+          health,
+        },
+        { status: 503 },
+      );
+    }
+
+    const programId = gate.ctx.membership.programId;
+    const organizationId = gate.ctx.labId;
 
     const prisma = getPrisma();
     const run = await prisma.agentRun.create({
       data: {
+        organizationId,
         programId,
         status: AgentRunStatus.QUEUED,
         trigger: "manual",
       },
     });
 
-    await getOpsQueue().add(
-      "weekly-ops",
-      {
-        programId,
-        runId: run.id,
-        trigger: "manual",
-      },
-      { jobId: run.id },
-    );
+    try {
+      await getOpsQueue().add(
+        "weekly-ops",
+        {
+          organizationId,
+          programId,
+          runId: run.id,
+          trigger: "manual",
+        },
+        { jobId: run.id },
+      );
+    } catch (enqueueError) {
+      await prisma.agentRun.update({
+        where: { id: run.id },
+        data: { status: AgentRunStatus.FAILED },
+      });
+      console.error("[api/ops/runs] enqueue failed", enqueueError);
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Failed to enqueue — Redis may be unreachable. Run left as FAILED.",
+          code: "REDIS_UNAVAILABLE",
+        },
+        { status: 503 },
+      );
+    }
 
     return NextResponse.json({
       ok: true,
+      processingDelayed: health.processingDelayed,
       run: {
         id: run.id,
         status: run.status,
         programId,
+        organizationId,
       },
     });
   } catch (error) {

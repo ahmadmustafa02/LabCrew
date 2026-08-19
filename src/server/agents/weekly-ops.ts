@@ -40,6 +40,7 @@ export async function executeWeeklyOps(runId: string) {
   });
 
   const programId = run.programId;
+  const organizationId = run.organizationId || run.program.organizationId;
 
   const steps: StepDef[] = [
     {
@@ -254,6 +255,7 @@ export async function executeWeeklyOps(runId: string) {
 
           await prisma.approvalItem.create({
             data: {
+              organizationId,
               programId,
               runId,
               kind: "nudge",
@@ -348,6 +350,7 @@ export async function executeWeeklyOps(runId: string) {
     for (const [index, def] of steps.entries()) {
       const step = await prisma.agentStep.create({
         data: {
+          organizationId,
           runId,
           agent: def.agent,
           title: def.title,

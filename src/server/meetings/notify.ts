@@ -2,6 +2,7 @@ import { appBaseUrl, sendMail } from "@/server/email/mailer";
 import { createNotifications } from "@/server/notifications/create";
 
 export async function notifyMeetingInvites(input: {
+  organizationId: string;
   programId: string;
   meetingId: string;
   title: string;
@@ -19,6 +20,7 @@ export async function notifyMeetingInvites(input: {
 
   await createNotifications(
     input.recipients.map((r) => ({
+      organizationId: input.organizationId,
       programId: input.programId,
       memberId: r.memberId,
       kind: "MEETING",

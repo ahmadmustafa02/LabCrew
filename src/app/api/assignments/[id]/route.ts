@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import { MemberRole } from "@prisma/client";
-import { getPrisma } from "@/lib/db";
-import {
-  assertSameProgram,
-  requireAuth,
-} from "@/server/auth/api-session";
+import { requireLabScope } from "@/server/tenancy/lab-scope";
+import { findMilestoneDetailInLab } from "@/server/tenancy/lab-repo";
 
 export const runtime = "nodejs";
 
@@ -14,42 +10,20 @@ function asAttachments(value: unknown) {
   return Array.isArray(value) ? value : [];
 }
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(request);
     if ("error" in gate) return gate.error;
 
     const { id } = await params;
-    const prisma = getPrisma();
-    const assignment = await prisma.milestone.findUnique({
-      where: { id },
-      include: {
-        submissions: {
-          include: {
-            member: { include: { user: true } },
-          },
-          orderBy: { updatedAt: "desc" },
-        },
-        program: {
-          include: {
-            members: {
-              where: { role: MemberRole.STUDENT },
-              select: { id: true },
-            },
-          },
-        },
-      },
-    });
+    const assignment = await findMilestoneDetailInLab(gate.ctx.labId, id);
 
     if (!assignment) {
       return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     }
 
-    const wrong = assertSameProgram(gate.session, assignment.programId);
-    if (wrong) return wrong;
-
-    const isDirector = gate.session.appRole === "director";
-    const myMemberId = gate.session.membership.id;
+    const isDirector = gate.ctx.appRole === "director";
+    const myMemberId = gate.ctx.membership.id;
 
     const submissions = isDirector
       ? assignment.submissions
@@ -75,6 +49,7 @@ export async function GET(_request: Request, { params }: Params) {
       assignment: {
         id: assignment.id,
         programId: assignment.programId,
+        organizationId: assignment.organizationId,
         title: assignment.title,
         description: assignment.description,
         instructions: assignment.instructions,

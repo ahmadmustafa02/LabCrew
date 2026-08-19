@@ -1,26 +1,26 @@
 import { MemberRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
-import { requireAuth } from "@/server/auth/api-session";
+import { inLab, requireLabScope } from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(request);
     if ("error" in gate) return gate.error;
 
     const prisma = getPrisma();
-    const programId = gate.session.membership.programId;
-    const me = gate.session.membership.id;
+    const programId = gate.ctx.membership.programId;
+    const me = gate.ctx.membership.id;
+    const lab = inLab(gate.ctx.labId);
 
-    if (gate.session.appRole === "student") {
-      const conv = await prisma.conversation.findUnique({
+    if (gate.ctx.appRole === "student") {
+      const conv = await prisma.conversation.findFirst({
         where: {
-          programId_studentMemberId: {
-            programId,
-            studentMemberId: me,
-          },
+          programId,
+          studentMemberId: me,
+          ...lab,
         },
         include: {
           messages: {
@@ -39,7 +39,7 @@ export async function GET() {
                 id: conv.id,
                 title: "Lab directors",
                 studentMemberId: me,
-                studentName: gate.session.name,
+                studentName: gate.ctx.name,
                 lastMessageAt: conv.lastMessageAt?.toISOString() ?? null,
                 lastPreview: conv.messages[0]?.body?.slice(0, 100) ?? null,
                 lastSenderName: conv.messages[0]?.sender.user.name ?? null,
@@ -50,7 +50,7 @@ export async function GET() {
     }
 
     const conversations = await prisma.conversation.findMany({
-      where: { programId },
+      where: { programId, ...lab },
       include: {
         student: { include: { user: true } },
         messages: {
@@ -63,7 +63,11 @@ export async function GET() {
     });
 
     const students = await prisma.member.findMany({
-      where: { programId, role: MemberRole.STUDENT },
+      where: {
+        programId,
+        organizationId: gate.ctx.labId,
+        role: MemberRole.STUDENT,
+      },
       include: { user: true },
       orderBy: { createdAt: "asc" },
     });
@@ -104,17 +108,18 @@ export async function GET() {
 /** Start or open a student↔directors thread */
 export async function POST(req: Request) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(req);
     if ("error" in gate) return gate.error;
 
     const prisma = getPrisma();
-    const programId = gate.session.membership.programId;
+    const programId = gate.ctx.membership.programId;
+    const organizationId = gate.ctx.labId;
     const body = (await req.json().catch(() => ({}))) as {
       studentMemberId?: string;
     };
 
-    let studentMemberId = gate.session.membership.id;
-    if (gate.session.appRole === "director") {
+    let studentMemberId = gate.ctx.membership.id;
+    if (gate.ctx.appRole === "director") {
       if (!body.studentMemberId) {
         return NextResponse.json(
           { ok: false, error: "studentMemberId required" },
@@ -125,6 +130,7 @@ export async function POST(req: Request) {
         where: {
           id: body.studentMemberId,
           programId,
+          organizationId,
           role: MemberRole.STUDENT,
         },
       });
@@ -141,10 +147,21 @@ export async function POST(req: Request) {
       where: {
         programId_studentMemberId: { programId, studentMemberId },
       },
-      create: { programId, studentMemberId },
+      create: {
+        organizationId,
+        programId,
+        studentMemberId,
+      },
       update: {},
       include: { student: { include: { user: true } } },
     });
+
+    if (conv.organizationId !== organizationId) {
+      return NextResponse.json(
+        { ok: false, error: "Conversation not found" },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json({
       ok: true,

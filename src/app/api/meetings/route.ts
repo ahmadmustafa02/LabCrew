@@ -1,7 +1,11 @@
 import { MeetingAudience, MemberRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
-import { requireAuth, requireDirector } from "@/server/auth/api-session";
+import {
+  inLab,
+  requireLabDirector,
+  requireLabScope,
+} from "@/server/tenancy/lab-scope";
 import { notifyMeetingInvites } from "@/server/meetings/notify";
 
 export const runtime = "nodejs";
@@ -52,19 +56,20 @@ function serializeMeeting(
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(request);
     if ("error" in gate) return gate.error;
 
-    const { session } = gate;
+    const { ctx } = gate;
     const prisma = getPrisma();
-    const programId = session.membership.programId;
-    const memberId = session.membership.id;
+    const programId = ctx.membership.programId;
+    const memberId = ctx.membership.id;
+    const lab = inLab(ctx.labId);
 
-    if (session.appRole === "director") {
+    if (ctx.appRole === "director") {
       const meetings = await prisma.meeting.findMany({
-        where: { programId },
+        where: { programId, ...lab },
         include: {
           createdBy: { include: { user: true } },
           invites: { include: { member: { include: { user: true } } } },
@@ -80,6 +85,7 @@ export async function GET() {
     const meetings = await prisma.meeting.findMany({
       where: {
         programId,
+        ...lab,
         invites: { some: { memberId } },
       },
       include: {
@@ -92,9 +98,13 @@ export async function GET() {
       orderBy: { startsAt: "asc" },
     });
 
-    // Mark invites read
     await prisma.meetingInvite.updateMany({
-      where: { memberId, readAt: null, meeting: { programId } },
+      where: {
+        memberId,
+        organizationId: ctx.labId,
+        readAt: null,
+        meeting: { programId, organizationId: ctx.labId },
+      },
       data: { readAt: new Date() },
     });
 
@@ -115,7 +125,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const gate = await requireDirector();
+    const gate = await requireLabDirector(req);
     if ("error" in gate) return gate.error;
 
     const body = (await req.json()) as {
@@ -155,10 +165,11 @@ export async function POST(req: Request) {
         : MeetingAudience.ALL;
 
     const prisma = getPrisma();
-    const programId = gate.session.membership.programId;
+    const programId = gate.ctx.membership.programId;
+    const organizationId = gate.ctx.labId;
 
     const students = await prisma.member.findMany({
-      where: { programId, role: MemberRole.STUDENT },
+      where: { programId, organizationId, role: MemberRole.STUDENT },
       include: { user: true },
     });
 
@@ -175,15 +186,16 @@ export async function POST(req: Request) {
       if (targets.length === 0) {
         return NextResponse.json(
           { ok: false, error: "No matching students in your program" },
-          { status: 400 },
+          { status: 404 },
         );
       }
     }
 
     const meeting = await prisma.meeting.create({
       data: {
+        organizationId,
         programId,
-        createdById: gate.session.membership.id,
+        createdById: gate.ctx.membership.id,
         title,
         agenda: body.agenda?.trim() || null,
         meetingUrl: body.meetingUrl?.trim() || null,
@@ -192,6 +204,7 @@ export async function POST(req: Request) {
         audience,
         invites: {
           create: targets.map((t) => ({
+            organizationId,
             memberId: t.id,
             notifiedAt: new Date(),
           })),
@@ -204,6 +217,7 @@ export async function POST(req: Request) {
     });
 
     await notifyMeetingInvites({
+      organizationId,
       programId,
       meetingId: meeting.id,
       title: meeting.title,

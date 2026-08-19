@@ -19,30 +19,12 @@ type Approval = {
   deliveredAt?: string | null;
 };
 
-const FALLBACK: Approval[] = [
-  {
-    id: "demo-1",
-    title: "Nudge - Ayesha Rahman",
-    targetName: "Ayesha Rahman",
-    body: "You've been quiet on the Week 4 demo. The smallest next step is a 3-minute status note - even if the demo isn't ready.",
-  },
-  {
-    id: "demo-2",
-    title: "Nudge - Daniel Okonkwo",
-    targetName: "Daniel Okonkwo",
-    body: "Your demo link is in - thanks. The writeup is still short of the rubric's methods + result section.",
-  },
-  {
-    id: "demo-3",
-    title: "Nudge - Mei Chen",
-    targetName: "Mei Chen",
-    body: "We couldn't open your demo URL. Can you repost a public link or a short screen recording?",
-  },
-];
-
 export function ApprovalsView() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
-  const [source, setSource] = useState<"live" | "demo" | "loading">("loading");
+  /** live = API ok; unavailable = load failed (must not look like empty inbox) */
+  const [source, setSource] = useState<"live" | "unavailable" | "loading">(
+    "loading",
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftBody, setDraftBody] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -56,13 +38,16 @@ export function ApprovalsView() {
       if (data.ok) {
         setApprovals(data.approvals ?? []);
         setSource("live");
+        setError(null);
         return;
       }
-      setApprovals(FALLBACK);
-      setSource("demo");
+      setApprovals([]);
+      setSource("unavailable");
+      setError(data.error ?? "Could not load approvals");
     } catch {
-      setApprovals(FALLBACK);
-      setSource("demo");
+      setApprovals([]);
+      setSource("unavailable");
+      setError("Could not load approvals — check your connection and try again");
     }
   }, []);
 
@@ -80,8 +65,8 @@ export function ApprovalsView() {
     action: "approve" | "reject" | "save",
     body?: string,
   ) {
-    if (source !== "live" || id.startsWith("demo-")) {
-      showToast("Demo mode - start a live weekly ops run to decide for real.");
+    if (source !== "live") {
+      showToast("Approvals still loading — try again in a moment.");
       return;
     }
 
@@ -168,11 +153,7 @@ export function ApprovalsView() {
           </h1>
           <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-lc-muted">
             Coach drafts wait here. Nothing leaves until you approve.
-            {source === "live"
-              ? " Live pending items from Postgres."
-              : source === "demo"
-                ? " Demo drafts until a live run creates approvals."
-                : ""}
+            {source === "live" ? " Live pending items from Postgres." : ""}
           </p>
           {error ? (
             <p className="mt-2 text-sm text-lc-danger">{error}</p>
@@ -189,7 +170,29 @@ export function ApprovalsView() {
         ready={source !== "loading"}
         skeleton={<CardListSkeleton count={3} />}
       >
-      {approvals.length === 0 ? (
+      {source === "unavailable" ? (
+        <div
+          role="alert"
+          className="rounded-[16px] border border-[var(--lc-danger)]/30 bg-[var(--lc-danger-soft)] px-5 py-10 text-sm text-lc-danger"
+        >
+          <p className="font-medium">Approvals unavailable</p>
+          <p className="mt-2 opacity-90">
+            Could not load pending drafts. This is not an empty inbox — refresh
+            or check the API / database connection.
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-4"
+            onClick={() => {
+              setSource("loading");
+              void load();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      ) : approvals.length === 0 ? (
         <div className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-10 text-sm text-lc-muted">
           No pending drafts. Run weekly ops from Mission Control when the cohort
           needs attention.

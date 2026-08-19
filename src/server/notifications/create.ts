@@ -2,6 +2,7 @@ import { getPrisma } from "@/lib/db";
 
 export async function createNotifications(
   items: {
+    organizationId: string;
     programId: string;
     memberId: string;
     kind: string;

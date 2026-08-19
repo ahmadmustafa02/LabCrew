@@ -1,6 +1,6 @@
-// LabCrew — Phase 1 schema contract
-// DB not required to run the Phase 1 UI (mock data).
-// Wire DATABASE_URL + migrate in Phase 1b / Phase 2.
+// LabCrew — multi-tenant schema
+// Tenant = organizationId (labId). Every tenant-owned row carries organizationId.
+// Enforcement is via repository helpers (requireLabScope / find*InLab) — never Prisma middleware.
 
 generator client {
   provider = "prisma-client-js"
@@ -68,23 +68,40 @@ enum ApprovalStatus {
 }
 
 model Organization {
-  id        String    @id @default(cuid())
+  id        String   @id @default(cuid())
   name      String
-  slug      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  programs  Program[]
-  members   Member[]
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  programs               Program[]
+  members                Member[]
+  milestones             Milestone[]
+  submissions            Submission[]
+  agentRuns              AgentRun[]
+  agentSteps             AgentStep[]
+  approvals              ApprovalItem[]
+  invites                Invite[]
+  files                  StoredFile[]
+  meetings               Meeting[]
+  meetingInvites         MeetingInvite[]
+  conversations          Conversation[]
+  messages               Message[]
+  notifications          Notification[]
+  announcements          Announcement[]
+  announcementRecipients AnnouncementRecipient[]
+  opsSchedules           ProgramOpsSchedule[]
+  apiAccessTokens        ApiAccessToken[]
 }
 
 model Program {
-  id             String           @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
   termLabel      String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   members        Member[]
   milestones     Milestone[]
   agentRuns      AgentRun[]
@@ -96,6 +113,9 @@ model Program {
   notifications  Notification[]
   announcements  Announcement[]
   opsSchedule    ProgramOpsSchedule?
+  apiAccessTokens ApiAccessToken[]
+
+  @@index([organizationId])
 }
 
 model User {
@@ -108,6 +128,7 @@ model User {
   updatedAt    DateTime @updatedAt
   members      Member[]
   resetTokens  PasswordResetToken[]
+  apiAccessTokens ApiAccessToken[]
 }
 
 model PasswordResetToken {
@@ -120,6 +141,32 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+/// Mobile / API bearer tokens. Plain token shown once; only sha256 hash stored.
+/// Scoped to a lab (organizationId) + program membership at issue time.
+model ApiAccessToken {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program       @relation(fields: [programId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member        @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  name           String
+  tokenHash      String        @unique
+  /// First 8 chars of the public token for support/revocation UX
+  tokenPrefix    String
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([memberId])
 }
 
 model Member {
@@ -140,110 +187,127 @@ model Member {
   notifications  Notification[]
   createdAnnouncements Announcement[] @relation("AnnouncementCreator")
   announcementRecipients AnnouncementRecipient[]
+  apiAccessTokens ApiAccessToken[]
 
   @@unique([programId, userId])
   @@index([organizationId])
 }
 
 model Milestone {
-  id           String          @id @default(cuid())
-  programId    String
-  program      Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  title        String
-  description  String?
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
   /// Professor instructions shown to students
-  instructions String?
+  instructions   String?
   /// [{ id, title, kind: "link"|"file", url }]
-  materials    Json?
+  materials      Json?
   /// { requireEvidenceUrl, requireWriteup, minWriteupLength, checklist: string[] }
-  rubric       Json?
-  dueAt        DateTime?
-  status       MilestoneStatus @default(UPCOMING)
-  sortOrder    Int             @default(0)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  submissions  Submission[]
+  rubric         Json?
+  dueAt          DateTime?
+  status         MilestoneStatus @default(UPCOMING)
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  submissions    Submission[]
+
+  @@index([organizationId])
+  @@index([programId])
 }
 
 model Submission {
-  id          String           @id @default(cuid())
-  milestoneId String
-  milestone   Milestone        @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
-  memberId    String
-  member      Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  status      SubmissionStatus @default(DRAFT)
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  milestoneId    String
+  milestone      Milestone        @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member           @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  status         SubmissionStatus @default(DRAFT)
   /// Demo URL, docs link, etc.
-  evidenceUrl String?
+  evidenceUrl    String?
   /// Optional GitHub repo for code deliverables
-  repoUrl     String?
-  writeup     String?
-  checklist   Json?
+  repoUrl        String?
+  writeup        String?
+  checklist      Json?
   /// [{ id, title, kind, url, originalName?, size? }]
-  attachments Json?
-  score       Json?
+  attachments    Json?
+  score          Json?
   /// Professor review status (null while still draft)
-  reviewStatus  ReviewStatus?
-  reviewComment String?
-  reviewedAt    DateTime?
-  reviewedById  String?
-  submittedAt DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  reviewStatus   ReviewStatus?
+  reviewComment  String?
+  reviewedAt     DateTime?
+  reviewedById   String?
+  submittedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@unique([milestoneId, memberId])
+  @@index([organizationId])
   @@index([memberId])
   @@index([reviewStatus])
 }
 
 model AgentRun {
-  id          String         @id @default(cuid())
-  programId   String
-  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
-  status      AgentRunStatus @default(QUEUED)
-  trigger     String         @default("manual")
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  summary     Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  steps       AgentStep[]
-  approvals   ApprovalItem[]
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  status         AgentRunStatus @default(QUEUED)
+  trigger        String         @default("manual")
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  summary        Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  steps          AgentStep[]
+  approvals      ApprovalItem[]
 
+  @@index([organizationId])
   @@index([programId, createdAt])
 }
 
 model AgentStep {
-  id          String          @id @default(cuid())
-  runId       String
-  run         AgentRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
-  agent       AgentName
-  title       String
-  status      AgentStepStatus @default(PENDING)
-  detail      String?
-  payload     Json?
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  sortOrder   Int             @default(0)
-  createdAt   DateTime        @default(now())
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  runId          String
+  run            AgentRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  agent          AgentName
+  title          String
+  status         AgentStepStatus @default(PENDING)
+  detail         String?
+  payload        Json?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
 
+  @@index([organizationId])
   @@index([runId, sortOrder])
 }
 
 model ApprovalItem {
-  id          String         @id @default(cuid())
-  programId   String
-  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
-  runId       String?
-  run         AgentRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
-  kind        String
-  title       String
-  body        String
-  targetName  String?
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId       String
+  program         Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  runId           String?
+  run             AgentRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  kind            String
+  title           String
+  body            String
+  targetName      String?
   /// Student email when known — used for free SMTP/console delivery
-  targetEmail String?
-  status      ApprovalStatus @default(PENDING)
-  createdAt   DateTime       @default(now())
-  decidedAt   DateTime?
+  targetEmail     String?
+  status          ApprovalStatus @default(PENDING)
+  createdAt       DateTime       @default(now())
+  decidedAt       DateTime?
   /// sent | console | failed | skipped
   deliveryStatus  String?
   /// smtp | console
@@ -251,38 +315,45 @@ model ApprovalItem {
   deliveryError   String?
   deliveredAt     DateTime?
 
+  @@index([organizationId])
   @@index([programId, status])
 }
 
 model Invite {
-  id          String     @id @default(cuid())
-  programId   String
-  program     Program    @relation(fields: [programId], references: [id], onDelete: Cascade)
-  email       String
-  role        MemberRole @default(STUDENT)
-  token       String     @unique
-  invitedById String?
-  expiresAt   DateTime
-  acceptedAt  DateTime?
-  createdAt   DateTime   @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  email          String
+  role           MemberRole   @default(STUDENT)
+  token          String       @unique
+  invitedById    String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime     @default(now())
 
+  @@index([organizationId])
   @@index([programId, email])
   @@index([token])
 }
 
 /// Durable free file storage in Postgres (no S3). Disk is an optional cache.
 model StoredFile {
-  id           String   @id @default(cuid())
-  programId    String
-  program      Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  filename     String   @unique
-  originalName String
-  contentType  String
-  size         Int
-  data         Bytes
-  uploadedById String?
-  createdAt    DateTime @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  filename       String       @unique
+  originalName   String
+  contentType    String
+  size           Int
+  data           Bytes
+  uploadedById   String?
+  createdAt      DateTime     @default(now())
 
+  @@index([organizationId])
   @@index([programId])
 }
 
@@ -299,57 +370,68 @@ enum RsvpStatus {
 
 /// Director-created lab meeting (Zoom/Meet link + agenda).
 model Meeting {
-  id          String          @id @default(cuid())
-  programId   String
-  program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  createdById String
-  createdBy   Member          @relation("MeetingCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  title       String
-  agenda      String?
-  meetingUrl  String?
-  startsAt    DateTime
-  endsAt      DateTime?
-  audience    MeetingAudience @default(ALL)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  invites     MeetingInvite[]
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdBy      Member          @relation("MeetingCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  title          String
+  agenda         String?
+  meetingUrl     String?
+  startsAt       DateTime
+  endsAt         DateTime?
+  audience       MeetingAudience @default(ALL)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  invites        MeetingInvite[]
 
+  @@index([organizationId])
   @@index([programId, startsAt])
 }
 
 model MeetingInvite {
-  id         String      @id @default(cuid())
-  meetingId  String
-  meeting    Meeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  memberId   String
-  member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  notifiedAt DateTime?
-  readAt     DateTime?
-  rsvp       RsvpStatus?
-  createdAt  DateTime    @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  meetingId      String
+  meeting        Meeting      @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  notifiedAt     DateTime?
+  readAt         DateTime?
+  rsvp           RsvpStatus?
+  createdAt      DateTime     @default(now())
 
   @@unique([meetingId, memberId])
+  @@index([organizationId])
   @@index([memberId])
 }
 
 /// One thread per student in a program (student ↔ directors).
 model Conversation {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   programId       String
-  program         Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  program         Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
   studentMemberId String
-  student         Member    @relation("StudentThread", fields: [studentMemberId], references: [id], onDelete: Cascade)
+  student         Member       @relation("StudentThread", fields: [studentMemberId], references: [id], onDelete: Cascade)
   lastMessageAt   DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   messages        Message[]
 
   @@unique([programId, studentMemberId])
+  @@index([organizationId])
   @@index([programId, lastMessageAt])
 }
 
 model Message {
   id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderMemberId String
@@ -359,45 +441,54 @@ model Message {
   /// Client optimistic id for smooth UI reconciliation
   clientId       String?
 
+  @@index([organizationId])
   @@index([conversationId, createdAt])
   @@index([senderMemberId])
 }
 
 model Notification {
-  id        String    @id @default(cuid())
-  programId String
-  program   Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  memberId  String
-  member    Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  kind      String
-  title     String
-  body      String?
-  href      String?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  kind           String
+  title          String
+  body           String?
+  href           String?
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
 
+  @@index([organizationId])
   @@index([memberId, createdAt])
   @@index([memberId, readAt])
 }
 
 /// Director broadcast (deadline moves, reminders, etc.)
 model Announcement {
-  id          String          @id @default(cuid())
-  programId   String
-  program     Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  createdById String
-  createdBy   Member          @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  title       String
-  body        String
-  audience    MeetingAudience @default(ALL)
-  createdAt   DateTime        @default(now())
-  recipients  AnnouncementRecipient[]
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  createdById    String
+  createdBy      Member          @relation("AnnouncementCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  title          String
+  body           String
+  audience       MeetingAudience @default(ALL)
+  createdAt      DateTime        @default(now())
+  recipients     AnnouncementRecipient[]
 
+  @@index([organizationId])
   @@index([programId, createdAt])
 }
 
 model AnnouncementRecipient {
   id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   announcementId String
   announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
   memberId       String
@@ -407,21 +498,26 @@ model AnnouncementRecipient {
   createdAt      DateTime     @default(now())
 
   @@unique([announcementId, memberId])
+  @@index([organizationId])
   @@index([memberId])
 }
 
 /// Auto weekly ops schedule (checked by worker tick).
 model ProgramOpsSchedule {
-  id             String    @id @default(cuid())
-  programId      String    @unique
-  program        Program   @relation(fields: [programId], references: [id], onDelete: Cascade)
-  enabled        Boolean   @default(false)
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String       @unique
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  enabled        Boolean      @default(false)
   /// 0 = Sunday … 6 = Saturday
-  dayOfWeek      Int       @default(0)
+  dayOfWeek      Int          @default(0)
   /// Local hour 0–23 in `timezone`
-  hourLocal      Int       @default(20)
-  timezone       String    @default("Asia/Karachi")
+  hourLocal      Int          @default(20)
+  timezone       String       @default("Asia/Karachi")
   lastEnqueuedAt DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
 }

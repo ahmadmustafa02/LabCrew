@@ -6,13 +6,14 @@ export async function canAccessConversation(
   conversationId: string,
   session: {
     appRole: string;
-    membership: { id: string; programId: string };
+    membership: { id: string; programId: string; organizationId: string };
   },
 ) {
   const prisma = getPrisma();
   const conv = await prisma.conversation.findFirst({
     where: {
       id: conversationId,
+      organizationId: session.membership.organizationId,
       programId: session.membership.programId,
     },
   });
@@ -23,6 +24,7 @@ export async function canAccessConversation(
 }
 
 export async function notifyNewMessage(input: {
+  organizationId: string;
   programId: string;
   conversationId: string;
   senderMemberId: string;
@@ -48,6 +50,7 @@ export async function notifyNewMessage(input: {
     });
     await createNotifications(
       directors.map((d) => ({
+        organizationId: input.organizationId,
         programId: input.programId,
         memberId: d.id,
         kind: "MESSAGE",
@@ -59,6 +62,7 @@ export async function notifyNewMessage(input: {
   } else {
     await createNotifications([
       {
+        organizationId: input.organizationId,
         programId: input.programId,
         memberId: input.studentMemberId,
         kind: "MESSAGE",

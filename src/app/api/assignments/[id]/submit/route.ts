@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { Prisma, ReviewStatus, SubmissionStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
-import {
-  assertSameProgram,
-  requireStudent,
-} from "@/server/auth/api-session";
+import { requireLabStudent } from "@/server/tenancy/lab-scope";
+import { findMilestoneInLab } from "@/server/tenancy/lab-repo";
 
 export const runtime = "nodejs";
 
@@ -19,29 +17,35 @@ type Attachment = {
   size?: number;
 };
 
-export async function GET(_request: Request, { params }: Params) {
+export async function GET(request: Request, { params }: Params) {
   try {
-    const gate = await requireStudent();
+    const gate = await requireLabStudent(request);
     if ("error" in gate) return gate.error;
 
     const { id: milestoneId } = await params;
-    const memberId = gate.session.membership.id;
+    const memberId = gate.ctx.membership.id;
     const prisma = getPrisma();
 
-    const milestone = await prisma.milestone.findUnique({
-      where: { id: milestoneId },
-    });
+    const milestone = await findMilestoneInLab(gate.ctx.labId, milestoneId);
     if (!milestone) {
-      return NextResponse.json({ ok: false, error: "Assignment not found" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Assignment not found" },
+        { status: 404 },
+      );
     }
-    const wrong = assertSameProgram(gate.session, milestone.programId);
-    if (wrong) return wrong;
 
     const submission = await prisma.submission.findUnique({
       where: {
         milestoneId_memberId: { milestoneId, memberId },
       },
     });
+
+    if (submission && submission.organizationId !== gate.ctx.labId) {
+      return NextResponse.json(
+        { ok: false, error: "Assignment not found" },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json({ ok: true, submission });
   } catch (error) {
@@ -57,11 +61,12 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function POST(request: Request, { params }: Params) {
   try {
-    const gate = await requireStudent();
+    const gate = await requireLabStudent(request);
     if ("error" in gate) return gate.error;
 
     const { id: milestoneId } = await params;
-    const memberId = gate.session.membership.id;
+    const memberId = gate.ctx.membership.id;
+    const labId = gate.ctx.labId;
     const body = (await request.json()) as {
       evidenceUrl?: string;
       repoUrl?: string;
@@ -71,16 +76,13 @@ export async function POST(request: Request, { params }: Params) {
       status?: "DRAFT" | "SUBMITTED";
     };
 
-    const prisma = getPrisma();
-    const milestone = await prisma.milestone.findUnique({
-      where: { id: milestoneId },
-    });
-
+    const milestone = await findMilestoneInLab(labId, milestoneId);
     if (!milestone) {
-      return NextResponse.json({ ok: false, error: "Assignment not found" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "Assignment not found" },
+        { status: 404 },
+      );
     }
-    const wrong = assertSameProgram(gate.session, milestone.programId);
-    if (wrong) return wrong;
 
     const status =
       body.status === "DRAFT" ? SubmissionStatus.DRAFT : SubmissionStatus.SUBMITTED;
@@ -99,18 +101,19 @@ export async function POST(request: Request, { params }: Params) {
         status === SubmissionStatus.SUBMITTED
           ? ReviewStatus.PENDING_REVIEW
           : null,
-      // clear prior review when resubmitting
       reviewComment:
         status === SubmissionStatus.SUBMITTED ? null : undefined,
       reviewedAt: status === SubmissionStatus.SUBMITTED ? null : undefined,
       reviewedById: status === SubmissionStatus.SUBMITTED ? null : undefined,
     };
 
+    const prisma = getPrisma();
     const submission = await prisma.submission.upsert({
       where: {
         milestoneId_memberId: { milestoneId, memberId },
       },
       create: {
+        organizationId: labId,
         milestoneId,
         memberId,
         evidenceUrl: data.evidenceUrl,
