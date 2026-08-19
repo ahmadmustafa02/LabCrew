@@ -44,7 +44,9 @@ On assignment **create** and **edit** (title/description change):
 1. Query **Semantic Scholar** (`/graph/v1/paper/search`); if empty/error → **arXiv** Atom API.
 2. Groq (if configured) may only **select indices + one-line rationale** from the returned catalog — never invent title/URL.
 3. Draft `ApprovalItem` with `kind: "resources"` (JSON body). Empty search → `status: "empty"` with an honest note (no fake success).
-4. On director approve → write `Milestone.coachResources` (students consume in Phase D). No email delivery for resource drafts.
+4. On director approve → write `Milestone.coachResources`. No email delivery for resource drafts.
+5. **Student visibility:** `coachResources` is returned on assignment GET for **directors only** until Phase D student UI ships (no student surface yet).
+6. **Rate limiting:** in-process search cache (30 min / query) + reuse pending Approvals draft when title/description query is unchanged (repeat edits do not re-hit S2/arXiv).
 
 ## Consequences
 

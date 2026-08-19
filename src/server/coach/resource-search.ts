@@ -14,6 +14,19 @@ export type RetrievedPaper = {
 
 const S2_FIELDS = "paperId,title,url,year,venue,externalIds";
 const FETCH_MS = 12_000;
+const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
+
+type CacheEntry = {
+  expiresAt: number;
+  value: {
+    query: string;
+    papers: RetrievedPaper[];
+    primarySource: "semanticscholar" | "arxiv" | "none";
+    error?: string;
+  };
+};
+
+const searchCache = new Map<string, CacheEntry>();
 
 function cleanQuery(raw: string) {
   return raw.replace(/\s+/g, " ").trim().slice(0, 200);
@@ -188,6 +201,7 @@ export function filterRelevantPapers(
 /**
  * Search papers for an assignment topic. Never invents results.
  * Returns empty array when nothing usable is found.
+ * Results are cached in-process for 30 minutes per normalized query.
  */
 export async function searchPapersForTopic(
   topic: string,
@@ -197,10 +211,17 @@ export async function searchPapersForTopic(
   papers: RetrievedPaper[];
   primarySource: "semanticscholar" | "arxiv" | "none";
   error?: string;
+  cacheHit?: boolean;
 }> {
   const query = cleanQuery(topic);
   if (query.length < 2) {
     return { query, papers: [], primarySource: "none", error: "Query too short" };
+  }
+
+  const cacheKey = `${query.toLowerCase()}::${limit}`;
+  const cached = searchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ...cached.value, cacheHit: true };
   }
 
   async function finalize(
@@ -220,18 +241,37 @@ export async function searchPapersForTopic(
     };
   }
 
+  let result: {
+    query: string;
+    papers: RetrievedPaper[];
+    primarySource: "semanticscholar" | "arxiv" | "none";
+    error?: string;
+  };
+
   try {
     const papers = await searchSemanticScholar(query, limit);
     if (papers.length > 0) {
-      return finalize(papers, "semanticscholar");
+      result = await finalize(papers, "semanticscholar");
+    } else {
+      try {
+        const arxivPapers = await searchArxiv(query, limit);
+        result = await finalize(arxivPapers, "arxiv");
+      } catch (err) {
+        result = {
+          query,
+          papers: [],
+          primarySource: "none",
+          error: err instanceof Error ? err.message : "arXiv failed",
+        };
+      }
     }
   } catch (err) {
     const s2Error = err instanceof Error ? err.message : "S2 failed";
     try {
       const papers = await searchArxiv(query, limit);
-      return finalize(papers, "arxiv", s2Error);
+      result = await finalize(papers, "arxiv", s2Error);
     } catch (err2) {
-      return {
+      result = {
         query,
         papers: [],
         primarySource: "none",
@@ -240,15 +280,9 @@ export async function searchPapersForTopic(
     }
   }
 
-  try {
-    const papers = await searchArxiv(query, limit);
-    return finalize(papers, "arxiv");
-  } catch (err) {
-    return {
-      query,
-      papers: [],
-      primarySource: "none",
-      error: err instanceof Error ? err.message : "arXiv failed",
-    };
-  }
+  searchCache.set(cacheKey, {
+    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+    value: result,
+  });
+  return { ...result, cacheHit: false };
 }

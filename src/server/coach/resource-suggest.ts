@@ -125,7 +125,8 @@ export function parseResourceApprovalBody(
 
 /**
  * Search + draft a resources ApprovalItem for a milestone (lab-scoped).
- * Replaces any pending resources draft for the same milestone title match.
+ * Skips external search when a pending draft already matches the same query
+ * (directors editing description repeatedly won't re-hit S2/arXiv).
  */
 export async function draftResourceSuggestionsForMilestone(input: {
   labId: string;
@@ -133,11 +134,52 @@ export async function draftResourceSuggestionsForMilestone(input: {
   milestoneId: string;
   title: string;
   description?: string | null;
-}): Promise<{ payload: ResourceDraftPayload; approvalId: string }> {
+  /** Force a fresh search even if pending draft matches */
+  forceRefresh?: boolean;
+}): Promise<{
+  payload: ResourceDraftPayload;
+  approvalId: string;
+  reusedPending: boolean;
+  searchCacheHit?: boolean;
+}> {
   const topic = [input.title, input.description]
     .filter(Boolean)
     .join(" — ")
     .trim();
+  const normalizedQuery = topic.replace(/\s+/g, " ").trim();
+
+  const prisma = getPrisma();
+  const pending = await prisma.approvalItem.findMany({
+    where: {
+      programId: input.programId,
+      kind: RESOURCE_KIND,
+      status: ApprovalStatus.PENDING,
+      ...inLab(input.labId),
+    },
+  });
+  const existingForMilestone = pending.filter((row) => {
+    const parsed = parseResourceApprovalBody(row.body);
+    return parsed?.milestoneId === input.milestoneId;
+  });
+
+  if (!input.forceRefresh) {
+    const sameQuery = existingForMilestone.find((row) => {
+      const parsed = parseResourceApprovalBody(row.body);
+      return (
+        parsed &&
+        parsed.query.replace(/\s+/g, " ").trim().toLowerCase() ===
+          normalizedQuery.toLowerCase()
+      );
+    });
+    if (sameQuery) {
+      const payload = parseResourceApprovalBody(sameQuery.body)!;
+      return {
+        payload,
+        approvalId: sameQuery.id,
+        reusedPending: true,
+      };
+    }
+  }
 
   const search = await searchPapersForTopic(topic, 10);
   let payload: ResourceDraftPayload;
@@ -165,23 +207,9 @@ export async function draftResourceSuggestionsForMilestone(input: {
     };
   }
 
-  const prisma = getPrisma();
-  // Drop prior pending resource drafts for this milestone (body contains milestoneId)
-  const pending = await prisma.approvalItem.findMany({
-    where: {
-      programId: input.programId,
-      kind: RESOURCE_KIND,
-      status: ApprovalStatus.PENDING,
-      ...inLab(input.labId),
-    },
-  });
-  const toDelete = pending.filter((row) => {
-    const parsed = parseResourceApprovalBody(row.body);
-    return parsed?.milestoneId === input.milestoneId;
-  });
-  if (toDelete.length) {
+  if (existingForMilestone.length) {
     await prisma.approvalItem.deleteMany({
-      where: { id: { in: toDelete.map((r) => r.id) } },
+      where: { id: { in: existingForMilestone.map((r) => r.id) } },
     });
   }
 
@@ -202,7 +230,12 @@ export async function draftResourceSuggestionsForMilestone(input: {
     },
   });
 
-  return { payload, approvalId: created.id };
+  return {
+    payload,
+    approvalId: created.id,
+    reusedPending: false,
+    searchCacheHit: Boolean(search.cacheHit),
+  };
 }
 
 /** Apply approved resource list onto the milestone (students read later in Phase D). */

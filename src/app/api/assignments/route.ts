@@ -162,6 +162,8 @@ export async function POST(request: Request) {
       resourceDraft = {
         approvalId: drafted.approvalId,
         status: drafted.payload.status,
+        reusedPending: drafted.reusedPending,
+        searchCacheHit: drafted.searchCacheHit ?? false,
       };
     } catch (err) {
       console.warn("[resources] draft on create failed", err);

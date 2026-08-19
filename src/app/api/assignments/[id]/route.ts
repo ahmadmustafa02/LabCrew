@@ -91,7 +91,8 @@ export async function GET(request: Request, { params }: Params) {
         materials: assignment.materials,
         rubric: assignment.rubric,
         dataSchema: parseDataSchema(assignment.dataSchema),
-        coachResources: assignment.coachResources ?? null,
+        // Approved reading list is director-visible until Phase D student UI ships.
+        coachResources: isDirector ? (assignment.coachResources ?? null) : null,
         dueAt: assignment.dueAt,
         status: assignment.status,
         stats: {
@@ -220,6 +221,8 @@ export async function PATCH(request: Request, { params }: Params) {
         resourceDraft = {
           approvalId: drafted.approvalId,
           status: drafted.payload.status,
+          reusedPending: drafted.reusedPending,
+          searchCacheHit: drafted.searchCacheHit ?? false,
         };
       } catch (err) {
         console.warn("[resources] draft on edit failed", err);
