@@ -117,3 +117,13 @@ export async function findMessageInLab(labId: string, messageId: string) {
     where: { id: messageId, ...inLab(labId) },
   });
 }
+
+export async function findDataPointsForSubmissionInLab(
+  labId: string,
+  submissionId: string,
+) {
+  return getPrisma().submissionDataPoint.findMany({
+    where: { submissionId, ...inLab(labId) },
+    orderBy: [{ rowIndex: "asc" }, { columnName: "asc" }],
+  });
+}

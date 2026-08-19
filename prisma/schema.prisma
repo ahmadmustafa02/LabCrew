@@ -78,6 +78,7 @@ model Organization {
   members                Member[]
   milestones             Milestone[]
   submissions            Submission[]
+  submissionDataPoints   SubmissionDataPoint[]
   agentRuns              AgentRun[]
   agentSteps             AgentStep[]
   approvals              ApprovalItem[]
@@ -205,8 +206,11 @@ model Milestone {
   instructions   String?
   /// [{ id, title, kind: "link"|"file", url }]
   materials      Json?
-  /// { requireEvidenceUrl, requireWriteup, minWriteupLength, checklist: string[] }
+  /// { requireEvidenceUrl, requireWriteup, minWriteupLength, checklist, acceptData?, requireData? }
   rubric         Json?
+  /// Optional director-defined columns for DATA submissions:
+  /// { columns: [{ name, type: "text"|"number"|"boolean" }] }
+  dataSchema     Json?
   dueAt          DateTime?
   status         MilestoneStatus @default(UPCOMING)
   sortOrder      Int             @default(0)
@@ -244,11 +248,41 @@ model Submission {
   submittedAt    DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
+  dataPoints     SubmissionDataPoint[]
 
   @@unique([milestoneId, memberId])
   @@index([organizationId])
   @@index([memberId])
   @@index([reviewStatus])
+}
+
+enum DataValueType {
+  TEXT
+  NUMBER
+  BOOLEAN
+}
+
+/// Generic key-value cells for structured DATA submissions (Phase A Collect).
+/// One row in a CSV ≈ many SubmissionDataPoint rows sharing the same rowIndex.
+model SubmissionDataPoint {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  submissionId   String
+  submission     Submission    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  rowIndex       Int
+  columnName     String
+  /// Canonical string storage; interpret with valueType
+  value          String
+  valueType      DataValueType @default(TEXT)
+  /// Phase B outlier / quality flag — unused in Phase A Collect
+  flagged        Boolean       @default(false)
+  flagReason     String?
+  createdAt      DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([submissionId, rowIndex])
+  @@index([organizationId, submissionId])
 }
 
 model AgentRun {

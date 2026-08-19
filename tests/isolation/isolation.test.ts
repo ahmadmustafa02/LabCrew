@@ -15,6 +15,7 @@ import {
   findAgentRunInLab,
   findApprovalInLab,
   findConversationInLab,
+  findDataPointsForSubmissionInLab,
   findInviteByJoinToken,
   findInviteInLab,
   findMeetingInLab,
@@ -55,6 +56,7 @@ function printLab(label: string, lab: LabSlice) {
   log(`  meetingId:              ${lab.meetingId}`);
   log(`  inviteId:               ${lab.inviteId}`);
   log(`  inviteToken:            ${lab.inviteToken}`);
+  log(`  dataPointId:            ${lab.dataPointId}`);
 }
 
 async function assertSees(
@@ -111,6 +113,38 @@ describe("lab-repo: positive A→A and negative A↛B", () => {
       "A cannot see B submission",
       await findSubmissionInLab(fixture.labA.organizationId, fixture.labB.submissionId),
     );
+  });
+
+  it("submission data points (structured DATA)", async () => {
+    log("\n[submissionDataPoint]");
+    const own = await findDataPointsForSubmissionInLab(
+      fixture.labA.organizationId,
+      fixture.labA.submissionId,
+    );
+    assert.ok(own.length >= 1, "A should see own data points");
+    assert.ok(
+      own.some((c) => c.id === fixture.labA.dataPointId),
+      "A should include seeded dataPointId",
+    );
+    assert.ok(
+      own.every((c) => c.organizationId === fixture.labA.organizationId),
+      "all cells must be lab A",
+    );
+    log(`  PASS  + A sees A data points → ${own.length} cell(s)`);
+
+    const cross = await findDataPointsForSubmissionInLab(
+      fixture.labA.organizationId,
+      fixture.labB.submissionId,
+    );
+    assert.equal(cross.length, 0, "A must not see B data points via B submissionId");
+    log(`  PASS  - A cannot see B data points → blocked (empty)`);
+
+    const flipped = await findDataPointsForSubmissionInLab(
+      fixture.labB.organizationId,
+      fixture.labA.submissionId,
+    );
+    assert.equal(flipped.length, 0, "B must not see A data points via A submissionId");
+    log(`  PASS  - B cannot see A data points → blocked (empty)`);
   });
 
   it("stored file", async () => {
@@ -304,6 +338,16 @@ describe("bearer token path (mobile auth) — cross-lab IDOR attempts", () => {
       "bearer A cannot see B file",
       await findStoredFileInLab(ctx.labId, fixture.labB.fileName),
     );
+    const bearerCrossData = await findDataPointsForSubmissionInLab(
+      ctx.labId,
+      fixture.labB.submissionId,
+    );
+    assert.equal(
+      bearerCrossData.length,
+      0,
+      "bearer A must not see B data points",
+    );
+    log(`  PASS  - bearer A cannot see B data points → blocked (empty)`);
   });
 
   it("Lab B bearer cannot see Lab A; revoke stops resolution", async () => {
