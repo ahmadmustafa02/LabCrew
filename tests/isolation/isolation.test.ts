@@ -147,6 +147,38 @@ describe("lab-repo: positive A→A and negative A↛B", () => {
     log(`  PASS  - B cannot see A data points → blocked (empty)`);
   });
 
+  it("IQR recompute stays lab-scoped", async () => {
+    log("\n[IQR lab-scope]");
+    const { getPrisma } = await import("../../src/lib/db");
+    const { recomputeIqrFlagsForMilestone } = await import(
+      "../../src/server/data/data-quality"
+    );
+    const prisma = getPrisma();
+    const beforeB = await prisma.submissionDataPoint.findMany({
+      where: { organizationId: fixture.labB.organizationId },
+      select: { id: true, flagged: true, flagReason: true },
+    });
+    await prisma.$transaction(async (tx) => {
+      await recomputeIqrFlagsForMilestone(
+        tx,
+        fixture.labA.organizationId,
+        fixture.labA.milestoneId,
+      );
+    });
+    const afterB = await prisma.submissionDataPoint.findMany({
+      where: { organizationId: fixture.labB.organizationId },
+      select: { id: true, flagged: true, flagReason: true },
+    });
+    assert.equal(afterB.length, beforeB.length);
+    for (const row of afterB) {
+      const prev = beforeB.find((b) => b.id === row.id);
+      assert.ok(prev);
+      assert.equal(row.flagged, prev!.flagged);
+      assert.equal(row.flagReason, prev!.flagReason);
+    }
+    log(`  PASS  - recompute IQR for Lab A left Lab B cells unchanged`);
+  });
+
   it("stored file", async () => {
     log("\n[storedFile]");
     const own = await findStoredFileInLab(

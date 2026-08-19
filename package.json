@@ -13,7 +13,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "worker": "tsx src/server/workers/ops-worker.ts",
-    "test:isolation": "tsx --test tests/isolation/isolation.test.ts"
+    "test:isolation": "tsx --test tests/isolation/isolation.test.ts",
+    "test:data": "tsx --test tests/data/submission-data.test.ts",
+    "test": "tsx --test tests/isolation/isolation.test.ts tests/data/submission-data.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
