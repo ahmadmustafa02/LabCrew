@@ -25,3 +25,5 @@ Then open Mission Control → **Run weekly ops** (live mode when seed is present
 2. Worker runs Pulse → Referee → Coach → Clerk and writes `AgentStep` rows  
 3. UI polls `GET /api/ops/runs/:id` until succeeded  
 4. Coach writes pending `ApprovalItem` rows for the Director board
+
+Clerk may append a **structured data** summary to the Monday Brief when the active milestone has `SubmissionDataPoint` rows — see [SYSTEM.md §6](./SYSTEM.md).

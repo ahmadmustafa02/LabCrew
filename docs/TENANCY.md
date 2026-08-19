@@ -1,5 +1,7 @@
 # Tenancy (Phase 1)
 
+System overview: [SYSTEM.md](./SYSTEM.md).
+
 ## Decisions (locked)
 
 | Decision | Choice |
