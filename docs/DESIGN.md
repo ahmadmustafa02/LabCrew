@@ -50,3 +50,16 @@ Avoid purple neon “AI SaaS” looks — charcoal + Apple blue.
 - Floating badge clutter on hero
 - Cards-for-everything
 - Chatbot widget as the product
+
+## Adaptive Coach tone (Phase D)
+
+Student-facing Coach copy follows **Fogg (Motivation · Ability · Trigger)** without dark patterns:
+
+| Do | Don't |
+| -- | ----- |
+| Name real progress ("3 in a row turned in") | Invent streaks, points, or leaderboards |
+| Invite a small next step | Guilt, countdown pressure, or "don't break your streak" |
+| Show director-approved reading at the assignment | Overwhelm with unread paper dumps |
+| Surface approved nudges as optional support | Auto-nag or badge spam |
+
+Tone: calm, specific, respectful of research time. Prefer verbs like *open*, *note*, *keep the rhythm* over *must*, *failing*, *behind*.

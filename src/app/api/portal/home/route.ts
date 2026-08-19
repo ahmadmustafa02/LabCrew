@@ -1,6 +1,10 @@
 import { MemberRole, MilestoneStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
+import {
+  loadApprovedNudgeForStudent,
+  loadStudentProgress,
+} from "@/server/coach/student-coach";
 import { inLab, requireLabStudent } from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
@@ -17,7 +21,7 @@ export async function GET(request: Request) {
     const lab = inLab(labId);
     const now = new Date();
 
-    const [meetings, milestones, notifications, unreadCount] =
+    const [meetings, milestones, notifications, unreadCount, progress, nudge] =
       await Promise.all([
         prisma.meeting.findMany({
           where: {
@@ -64,6 +68,13 @@ export async function GET(request: Request) {
             readAt: null,
             kind: { not: "MEETING" },
           },
+        }),
+        loadStudentProgress({ labId, programId, memberId }),
+        loadApprovedNudgeForStudent({
+          labId,
+          programId,
+          email: gate.ctx.email,
+          name: gate.ctx.name,
         }),
       ]);
 
@@ -122,6 +133,24 @@ export async function GET(request: Request) {
           name: d.user.name,
           role: d.role,
         })),
+        coach: {
+          progress: {
+            streak: progress.streak,
+            submittedCount: progress.submittedCount,
+            milestoneCount: progress.milestoneCount,
+            openCount: progress.openCount,
+            headline: progress.headline,
+            detail: progress.detail,
+          },
+          nudge: nudge
+            ? {
+                id: nudge.id,
+                title: nudge.title,
+                body: nudge.body,
+                decidedAt: nudge.decidedAt,
+              }
+            : null,
+        },
       },
     });
   } catch (error) {

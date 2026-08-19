@@ -33,6 +33,22 @@ type Home = {
   }[];
   unreadNotifications: number;
   directors: { name: string; role: string }[];
+  coach?: {
+    progress: {
+      streak: number;
+      submittedCount: number;
+      milestoneCount: number;
+      openCount: number;
+      headline: string;
+      detail: string;
+    };
+    nudge: {
+      id: string;
+      title: string;
+      body: string;
+      decidedAt: string | null;
+    } | null;
+  };
 };
 
 function when(iso: string) {
@@ -107,9 +123,43 @@ export function StudentHomeView() {
               Home
             </h1>
             <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-lc-muted">
-              Meetings, tasks, and unread updates from your lab directors.
+              Your pace, a note from Coach when your director approves one, and
+              what&apos;s next in the lab.
             </p>
           </div>
+
+          {home.coach ? (
+            <section className="space-y-3">
+              <div className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-lc-muted">
+                  Your pace
+                </p>
+                <p className="mt-2 text-xl font-semibold tracking-tight text-lc-ink">
+                  {home.coach.progress.headline}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-lc-muted">
+                  {home.coach.progress.detail}
+                </p>
+              </div>
+              {home.coach.nudge ? (
+                <article className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5">
+                  <p className="text-xs font-medium uppercase tracking-wide text-lc-muted">
+                    From Coach · director-approved
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed text-lc-ink">
+                    {home.coach.nudge.body}
+                  </p>
+                  <div className="mt-4">
+                    <Link href="/app/assignments">
+                      <Button variant="accent" size="sm">
+                        Open my tasks
+                      </Button>
+                    </Link>
+                  </div>
+                </article>
+              ) : null}
+            </section>
+          ) : null}
 
           <div className="flex flex-wrap gap-2">
             <Link href="/app/messages">

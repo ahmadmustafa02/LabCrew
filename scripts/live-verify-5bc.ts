@@ -346,13 +346,17 @@ async function main() {
       "Director coachResources present:",
       Boolean(dirJson.assignment?.coachResources),
     );
-    if (stuJson.assignment?.coachResources != null) {
-      throw new Error("Students must not see coachResources until Phase D UI");
+    // Phase D: students see approved found lists; directors see raw JSON
+    const stuRes = stuJson.assignment?.coachResources as
+      | { status?: string; items?: unknown[] }
+      | null;
+    if (!stuRes || stuRes.status !== "found" || !stuRes.items?.length) {
+      throw new Error("Phase D: students should see approved coachResources");
     }
     if (!dirJson.assignment?.coachResources) {
       throw new Error("Director should see coachResources after approve");
     }
-    console.log("PASS students cannot see list yet; directors can via API\n");
+    console.log("PASS students see approved reading list (Phase D)\n");
   } finally {
     await revokeApiAccessToken(stuTok.id, student.organizationId);
     await revokeApiAccessToken(dirTok.id, director.organizationId);

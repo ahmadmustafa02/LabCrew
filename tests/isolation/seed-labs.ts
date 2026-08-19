@@ -38,6 +38,10 @@ export type LabSlice = {
   inviteToken: string;
   dataPointId: string;
   engagementScoreId: string;
+  /** Phase D: approved nudge visible to this lab's student only */
+  approvedNudgeId: string;
+  /** Phase D: pending nudge must never surface to students */
+  pendingNudgeId: string;
 };
 
 export type IsolationFixture = {
@@ -204,6 +208,61 @@ export async function seedIsolationLabs(): Promise<{
         title: `Secret nudge ${slug}`,
         body: `Do not leak ${slug}`,
         targetName: student.name,
+        targetEmail: student.email,
+      },
+    });
+
+    const pendingNudge = await prisma.approvalItem.create({
+      data: {
+        organizationId: org.id,
+        programId: program.id,
+        kind: "nudge",
+        title: `Pending secret ${slug}`,
+        body: `PENDING-ONLY-${slug}`,
+        targetName: student.name,
+        targetEmail: student.email,
+        status: "PENDING",
+      },
+    });
+
+    const approvedNudge = await prisma.approvalItem.create({
+      data: {
+        organizationId: org.id,
+        programId: program.id,
+        kind: "nudge",
+        title: `Approved nudge ${slug}`,
+        body: `APPROVED-NUDGE-${slug}`,
+        targetName: student.name,
+        targetEmail: student.email,
+        status: "APPROVED",
+        decidedAt: new Date(),
+        deliveryStatus: "console",
+        deliveryChannel: "console",
+        deliveredAt: new Date(),
+      },
+    });
+
+    // Approved reading list on the milestone (Phase D Ability)
+    await prisma.milestone.update({
+      where: { id: milestone.id },
+      data: {
+        coachResources: {
+          status: "found",
+          query: `secret-topic-${slug}`,
+          note: "isolation seed",
+          approvedAt: new Date().toISOString(),
+          items: [
+            {
+              title: `Paper for ${slug}`,
+              url: `https://arxiv.org/abs/isolation-${slug}`,
+              year: 2026,
+              venue: "arXiv",
+              source: "arxiv",
+              paperId: `isolation-${slug}`,
+              rationale: `lab-secret-resource-${slug}`,
+            },
+          ],
+        },
       },
     });
     const fileName = `iso-${slug}-${Date.now()}.txt`;
@@ -310,6 +369,8 @@ export async function seedIsolationLabs(): Promise<{
       inviteToken: invite.token,
       dataPointId: dataPoint.id,
       engagementScoreId: engagementScore.id,
+      approvedNudgeId: approvedNudge.id,
+      pendingNudgeId: pendingNudge.id,
     };
   }
 

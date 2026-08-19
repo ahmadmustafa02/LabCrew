@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ApprovalStatus } from "@prisma/client";
+import { ApprovalStatus, MemberRole } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import { requireLabDirector } from "@/server/tenancy/lab-scope";
 import { findApprovalInLab } from "@/server/tenancy/lab-repo";
@@ -8,6 +8,7 @@ import {
   RESOURCE_KIND,
   applyApprovedResources,
 } from "@/server/coach/resource-suggest";
+import { createNotifications } from "@/server/notifications/create";
 
 export const runtime = "nodejs";
 
@@ -131,6 +132,36 @@ export async function PATCH(request: Request, { params }: Params) {
           deliveredAt: new Date(),
         },
       });
+
+      // Phase D — surface approved nudge in student portal (own only)
+      if (result.ok && updated.targetEmail) {
+        const student = await prisma.member.findFirst({
+          where: {
+            programId: updated.programId,
+            organizationId: gate.ctx.labId,
+            role: MemberRole.STUDENT,
+            user: {
+              email: {
+                equals: updated.targetEmail.trim().toLowerCase(),
+                mode: "insensitive",
+              },
+            },
+          },
+        });
+        if (student) {
+          await createNotifications([
+            {
+              organizationId: gate.ctx.labId,
+              programId: updated.programId,
+              memberId: student.id,
+              kind: "NUDGE",
+              title: "Note from Coach",
+              body: updated.body.slice(0, 280),
+              href: "/app/home",
+            },
+          ]);
+        }
+      }
 
       delivery = {
         ok: result.ok,
