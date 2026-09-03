@@ -58,14 +58,21 @@ export function RoleGate({ children, allow }: Props) {
     }
   }, [ready, role, pathname, router, allow]);
 
-  if (
-    ready &&
-    ((allow === "student" && role !== "student") ||
-      (allow === "director" && role !== "director") ||
-      (role === "student" && isDirectorOnly(pathname)) ||
-      (role === "director" && isStudentOnly(pathname)))
-  ) {
+  if (!ready) {
     return <p className="text-sm text-lc-muted">Opening your workspace…</p>;
+  }
+
+  if (
+    (allow === "student" && role !== "student") ||
+    (allow === "director" && role !== "director") ||
+    (role === "student" && isDirectorOnly(pathname)) ||
+    (role === "director" && isStudentOnly(pathname))
+  ) {
+    return (
+      <p className="text-sm text-lc-muted">
+        That page isn’t available in this workspace — taking you home…
+      </p>
+    );
   }
 
   return children;

@@ -28,11 +28,23 @@ function LoginFormInner() {
   const search = useSearchParams();
   const next = search.get("next") || "/app";
   const switched = search.get("switch") === "1";
+  const authError = search.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showDemo, setShowDemo] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    if (authError === "AccessDenied") {
+      return "Google sign-in could not finish. Usually the database is down — start Docker (postgres on :5434) and try again.";
+    }
+    if (authError === "OAuthAccountNotLinked") {
+      return "That Google account is linked differently. Try email sign-in or another Google account.";
+    }
+    if (authError) {
+      return "Sign-in failed. Try again or use email.";
+    }
+    return null;
+  });
 
   const subtitle = useMemo(() => {
     if (switched) return "Choose another account to continue.";
@@ -53,8 +65,7 @@ function LoginFormInner() {
       setError("Invalid email or password.");
       return;
     }
-    router.replace(next);
-    router.refresh();
+    window.location.assign(next.startsWith("/") ? next : "/app");
   }
 
   return (
@@ -117,9 +128,15 @@ function LoginFormInner() {
       </form>
 
       <p className="mt-6 text-center text-sm text-lc-muted">
-        New lab?{" "}
+        Invited to a lab?{" "}
+        <Link href="/join" className="font-medium text-lc-ink hover:underline">
+          Join with invite link
+        </Link>
+      </p>
+      <p className="mt-2 text-center text-sm text-lc-muted">
+        Creating a new lab?{" "}
         <Link href="/signup" className="font-medium text-lc-ink hover:underline">
-          Create an account
+          Start free
         </Link>
       </p>
 

@@ -42,6 +42,11 @@ export async function GET(request: Request) {
       );
     }
 
+    const existing = await getPrisma().user.findUnique({
+      where: { email: invite.email.toLowerCase() },
+      select: { id: true, passwordHash: true },
+    });
+
     return NextResponse.json({
       ok: true,
       invite: {
@@ -50,6 +55,8 @@ export async function GET(request: Request) {
         programName: invite.program.name,
         orgName: invite.program.organization.name,
         expiresAt: invite.expiresAt,
+        existingAccount: Boolean(existing),
+        hasPassword: Boolean(existing?.passwordHash),
       },
     });
   } catch (error) {
@@ -103,7 +110,6 @@ export async function POST(request: Request) {
     }
 
     const prisma = getPrisma();
-    const passwordHash = await bcrypt.hash(password, 10);
     const email = invite.email.toLowerCase();
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -122,13 +128,26 @@ export async function POST(request: Request) {
         );
       }
 
+      // Never overwrite an existing password — verify it, or set one if missing.
+      if (existing.passwordHash) {
+        const match = await bcrypt.compare(password, existing.passwordHash);
+        if (!match) {
+          return NextResponse.json(
+            { ok: false, error: "Wrong password for this email — use your existing password" },
+            { status: 401 },
+          );
+        }
+      }
+
+      const userUpdate: { name: string; passwordHash?: string } = { name };
+      if (!existing.passwordHash) {
+        userUpdate.passwordHash = await bcrypt.hash(password, 10);
+      }
+
       await prisma.$transaction([
         prisma.user.update({
           where: { id: existing.id },
-          data: {
-            name,
-            passwordHash,
-          },
+          data: userUpdate,
         }),
         prisma.member.create({
           data: {
@@ -147,10 +166,12 @@ export async function POST(request: Request) {
       return NextResponse.json({
         ok: true,
         email,
+        role: invite.role,
         message: "Joined — sign in with your email and password",
       });
     }
 
+    const passwordHash = await bcrypt.hash(password, 10);
     await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: { email, name, passwordHash },
@@ -172,6 +193,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       email,
+      role: invite.role,
       message: "Account created — sign in with your email and password",
     });
   } catch (error) {

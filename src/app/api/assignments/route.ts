@@ -6,22 +6,22 @@ import type {
   AssignmentRubric,
   MaterialItem,
 } from "@/lib/assignment-types";
-import { requireAuth, requireDirector } from "@/server/auth/api-session";
+import { requireDirector } from "@/server/auth/api-session";
 import { parseDataSchema } from "@/server/data/submission-data";
-import { draftResourceSuggestionsForMilestone } from "@/server/coach/resource-suggest";
+import { inLab, requireLabScope } from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const gate = await requireAuth();
+    const gate = await requireLabScope(request);
     if ("error" in gate) return gate.error;
 
-    const { membership } = gate.session;
+    const { membership, appRole, labId } = gate.ctx;
     const prisma = getPrisma();
 
     const assignments = await prisma.milestone.findMany({
-      where: { programId: membership.programId },
+      where: { programId: membership.programId, ...inLab(labId) },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
         submissions: {
@@ -43,7 +43,7 @@ export async function GET() {
       },
     });
 
-    const isStudent = gate.session.appRole === "student";
+    const isStudent = appRole === "student";
     const myId = membership.id;
 
     return NextResponse.json({
@@ -149,27 +149,7 @@ export async function POST(request: Request) {
       },
     });
 
-    // Phase C — retrieval-grounded resource draft → Approvals (never invents)
-    let resourceDraft: { approvalId: string; status: string } | null = null;
-    try {
-      const drafted = await draftResourceSuggestionsForMilestone({
-        labId: organizationId,
-        programId,
-        milestoneId: assignment.id,
-        title: assignment.title,
-        description: assignment.description,
-      });
-      resourceDraft = {
-        approvalId: drafted.approvalId,
-        status: drafted.payload.status,
-        reusedPending: drafted.reusedPending,
-        searchCacheHit: drafted.searchCacheHit ?? false,
-      };
-    } catch (err) {
-      console.warn("[resources] draft on create failed", err);
-    }
-
-    return NextResponse.json({ ok: true, assignment, resourceDraft });
+    return NextResponse.json({ ok: true, assignment });
   } catch (error) {
     return NextResponse.json(
       {

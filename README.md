@@ -22,10 +22,11 @@ LabCrew is the operating system for **research labs and internship cohorts** —
 
 | For directors | For students |
 | ------------- | ------------ |
-| Run weekly ops from Mission Control | Submit work with files, links, and writeups |
-| Review submissions (pending → revision → approved → done) | Track review status and professor comments |
+| Run weekly ops from Mission Control | Submit work with files, links, writeups, and optional structured data |
+| Review submissions on a work-log thread (pending → revision → approved → done) | Track review status, professor comments, and resubmit as new posts |
 | Approve or edit nudges before email | Join meetings, RSVP, read announcements |
 | Read / export the Monday Brief | Message directors in one thread |
+| Switch across labs when you belong to more than one | See only the active lab’s work |
 
 ---
 
@@ -41,6 +42,7 @@ Research cohorts drown in Slack threads, missing demos, and silent students. Lab
 - **Deterministic orchestration** — agents run in a fixed pipeline (BullMQ worker)
 - **LLMs only where language/scoring helps** — optional; heuristics work without a key
 - **Human-in-the-loop** — nudges never auto-send
+- **Lab-scoped tenancy** — every query is tied to the active organization; multi-lab users switch memberships in the shell
 - **One workspace** — assignments, meetings, messages, announcements, analytics
 
 ---
@@ -49,17 +51,25 @@ Research cohorts drown in Slack threads, missing demos, and silent students. Lab
 
 ### Director
 
-- **Monday Brief** — compiled briefing + Markdown / print export  
+- **Monday Brief** — compiled briefing, standup agenda, cohort data summary, Markdown / print export  
 - **Mission Control** — dispatch Pulse → Referee → Coach → Clerk  
-- **Assignments** — materials, rubrics, ClickUp-style review workflow  
-- **Approvals** — edit / approve / reject nudge drafts (SMTP when configured)  
-- **Meetings · Messages · Announcements · Analytics · Team**
+- **Assignments** — materials, rubrics, structured data schemas, open/close/reopen, Teams-style list + detail  
+- **Approvals** — edit / approve / reject **nudge** drafts (email + in-app note when approved; SMTP when configured)  
+- **Meetings · Messages · Announcements · Analytics · Team** (invites, roles, revoke)
 
 ### Student
 
-- **Home** — upcoming meetings, tasks, unseen inbox  
-- **My tasks** — submit evidence, attachments, repos, writeups  
+- **Home** — upcoming meetings, tasks, unseen inbox, notes from Coach  
+- **Assignments** — turn in evidence; each attempt is a **work-log post** (edit a post, or turn in again after feedback)  
 - **Meetings · Messages · Announcements**
+
+### Collaboration on submissions
+
+Students and directors share a per-submission **work feed**: posts for each turn-in, comments, and light reactions — so review history stays on the assignment instead of disappearing into chat.
+
+### Structured cohort data (optional)
+
+Assignments can collect CSV / form rows as lab-scoped data cells (validate → flag outliers → summarize on the Brief with privacy floors). Details: [docs/DATA.md](./docs/DATA.md).
 
 ### Marketing site
 
@@ -74,7 +84,7 @@ Polished SaaS pages with light/dark mode: `/` · `/product` · `/how-it-works` �
 | App | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 |
 | Data | PostgreSQL · Prisma 7 · files stored in Postgres (no S3 required) |
 | Jobs | Redis · BullMQ worker (`npm run worker`) |
-| Auth | Auth.js — credentials, invites, optional Google OAuth |
+| Auth | Auth.js — credentials, invites, optional Google OAuth · active lab via membership |
 | Email | Optional SMTP (e.g. free Gmail App Password); else console |
 | LLM | Optional OpenAI-compatible API (defaults to Groq) |
 
@@ -145,11 +155,12 @@ Full free-host notes: [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) · Administra
 
 1. **Sign up** at `/signup` → creates your organization + program  
 2. **Invite a student** from Team (copy invite link) · or use a second browser / account  
-3. **Create an assignment** with materials + rubric  
-4. As student: **submit** writeup / links / attachments  
-5. As director: **review** → Pending / Needs revision / Approved / Done  
+3. **Create an assignment** with materials + rubric (optional data schema)  
+4. As student: **submit** writeup / links / attachments → appears as a work-log post  
+5. As director: **review** on the thread → Pending / Needs revision / Approved / Done  
 6. **Run weekly ops** in Mission Control (worker running)  
-7. **Approvals** → edit & approve a nudge · open **Monday Brief**
+7. **Approvals** → edit & approve a nudge (email + in-app) · open **Monday Brief**  
+8. If you join another lab, use the **lab switcher** in the shell — lists and reviews stay scoped to the active lab  
 
 Seeded demo password (if you ran `npm run db:seed`): `labcrew`
 
@@ -158,12 +169,14 @@ Seeded demo password (if you ran `npm run db:seed`): `labcrew`
 ## Scripts
 
 ```bash
-npm run dev          # Next.js
-npm run worker       # BullMQ ops worker
-npm run build        # Production build
-npm run db:migrate   # Prisma migrate (dev)
-npm run db:seed      # Demo cohort
-npm run db:studio    # Prisma Studio
+npm run dev              # Next.js
+npm run worker           # BullMQ ops worker
+npm run build            # Production build
+npm run db:migrate       # Prisma migrate (dev)
+npm run db:seed          # Demo cohort
+npm run db:studio        # Prisma Studio
+npm run test             # Isolation + data tests
+npm run test:isolation   # Lab tenancy isolation suite
 ```
 
 ---
@@ -192,6 +205,8 @@ npm run db:studio    # Prisma Studio
                           (runs, approvals, brief)
 ```
 
+Approving a **nudge** delivers it to the named student (SMTP or console) and creates an in-app notification. It does not change assignment or submission status.
+
 ---
 
 ## Product rules
@@ -201,6 +216,7 @@ npm run db:studio    # Prisma Studio
 - No GitHub PR review features (CodePulse)
 - LLMs assist scoring/copy; orchestration stays deterministic
 - Prefer honest empty states over silent fake success in production demos
+- Tenancy is enforced in helpers (`requireLabScope` / `find*InLab`) — never trust client-supplied lab IDs
 
 ---
 
@@ -208,9 +224,15 @@ npm run db:studio    # Prisma Studio
 
 | Doc | Contents |
 | --- | -------- |
-| [docs/PHASES.md](./docs/PHASES.md) | Build phases 0–4 |
+| [ADMIN.md](./ADMIN.md) | Install, worker health, day-2 ops |
+| [docs/SYSTEM.md](./docs/SYSTEM.md) | System design overview |
+| [docs/TENANCY.md](./docs/TENANCY.md) | Lab scope, bearer tokens, isolation rules |
+| [docs/DATA.md](./docs/DATA.md) | Structured submissions pipeline |
+| [docs/WORKERS.md](./docs/WORKERS.md) | BullMQ worker notes |
+| [docs/PHASES.md](./docs/PHASES.md) | Build phases |
 | [docs/DESIGN.md](./docs/DESIGN.md) | Design system · light/dark tokens |
 | [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) | $0 self-host, Gmail SMTP, Google OAuth |
+| [docs/diagrams/](./docs/diagrams/) | C4 / ops Mermaid diagrams |
 
 ---
 

@@ -238,26 +238,30 @@ export function StudentHomeView() {
             ) : (
               <ul className="divide-y divide-[var(--lc-line)] rounded-[14px] border border-[var(--lc-line)] bg-lc-surface">
                 {home.tasks.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{t.title}</p>
-                      <p className="text-xs text-lc-muted">
-                        {t.status}
-                        {t.dueAt ? ` · due ${when(t.dueAt)}` : ""}
-                      </p>
-                    </div>
-                    <span
-                      className={
-                        t.submitted
-                          ? "text-xs font-medium text-lc-success"
-                          : "text-xs font-medium text-lc-warn"
-                      }
+                  <li key={t.id}>
+                    <Link
+                      href={`/app/assignments/${t.id}`}
+                      className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                     >
-                      {t.submitted ? "Submitted" : "Open"}
-                    </span>
+                      <div>
+                        <p className="text-sm font-medium text-lc-ink">
+                          {t.title}
+                        </p>
+                        <p className="text-xs text-lc-muted">
+                          {t.status}
+                          {t.dueAt ? ` · due ${when(t.dueAt)}` : ""}
+                        </p>
+                      </div>
+                      <span
+                        className={
+                          t.submitted
+                            ? "text-xs font-medium text-lc-success"
+                            : "text-xs font-medium text-lc-warn"
+                        }
+                      >
+                        {t.submitted ? "Submitted" : "Open"}
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>

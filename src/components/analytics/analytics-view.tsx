@@ -136,7 +136,7 @@ export function AnalyticsView() {
       </div>
 
       <SoftReveal
-        ready={!loading && Boolean(cards)}
+        ready={!loading}
         skeleton={
           <div className="space-y-6">
             <StatRowSkeleton count={4} />
@@ -144,14 +144,50 @@ export function AnalyticsView() {
           </div>
         }
       >
+        {!cards ? (
+          <div
+            role="alert"
+            className="rounded-[16px] border border-[var(--lc-danger)]/30 bg-[var(--lc-danger-soft)] px-5 py-10 text-sm text-lc-danger"
+          >
+            <p className="font-medium">Analytics unavailable</p>
+            <p className="mt-2 opacity-90">
+              {error ??
+                "Could not load cohort health. Check the database connection and try again."}
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-4"
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                void (async () => {
+                  try {
+                    const analyticsRes = await fetch("/api/demo/analytics");
+                    await loadEngagement().catch(() => null);
+                    const json = await analyticsRes.json();
+                    if (json.ok) setData(json.analytics);
+                    else setError(json.error ?? "Unavailable");
+                  } catch {
+                    setError("Analytics unavailable - is Docker running?");
+                  } finally {
+                    setLoading(false);
+                  }
+                })();
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : (
         <div className="space-y-6">
           <div className="grid gap-3 sm:grid-cols-2">
-            {(cards ?? []).map((row) => (
+            {cards.map((row) => (
               <div
                 key={row.label}
                 className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5"
               >
-                <p className="text-xs text-lc-muted">{row.label}</p>
+                <p className="text-xs font-medium text-lc-muted">{row.label}</p>
                 <p className="mt-2 text-3xl font-semibold tracking-tight text-lc-ink">
                   {row.value}
                 </p>
@@ -261,6 +297,7 @@ export function AnalyticsView() {
             )}
           </section>
         </div>
+        )}
       </SoftReveal>
     </div>
   );

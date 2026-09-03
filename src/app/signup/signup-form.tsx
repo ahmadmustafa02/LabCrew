@@ -46,14 +46,13 @@ function SignupFormInner() {
         redirect: false,
       });
       if (login?.error) {
-        router.push("/login");
+        window.location.assign("/login");
         return;
       }
-      router.replace("/app/brief");
-      router.refresh();
+      window.location.assign("/app/brief");
+      return;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Signup failed");
-    } finally {
       setBusy(false);
     }
   }

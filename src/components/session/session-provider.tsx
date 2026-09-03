@@ -16,8 +16,10 @@ type SessionState = {
   studentMemberId: string | null;
   studentName: string | null;
   programName: string | null;
+  organizationName: string | null;
   userName: string | null;
   userEmail: string | null;
+  memberId: string | null;
   needsOnboarding: boolean;
   ready: boolean;
   switchAccount: () => Promise<void>;
@@ -43,25 +45,27 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<SessionState>(() => {
-    const role = (data?.user?.role as AppRole) ?? "director";
+    const role = (data?.user?.role as AppRole | undefined) ?? "student";
     const needsOnboarding = Boolean(
       (data?.user as { needsOnboarding?: boolean } | undefined)
         ?.needsOnboarding,
     );
+    const memberId = data?.user?.memberId ?? null;
     return {
       role,
-      studentMemberId:
-        role === "student" ? (data?.user?.memberId ?? null) : null,
+      studentMemberId: role === "student" ? memberId : null,
       studentName: role === "student" ? (data?.user?.name ?? null) : null,
       programName: data?.user?.programName ?? null,
+      organizationName: data?.user?.organizationName ?? null,
       userName: data?.user?.name ?? null,
       userEmail: data?.user?.email ?? null,
+      memberId,
       needsOnboarding,
-      ready,
+      ready: ready && status !== "loading",
       switchAccount,
       signOutUser,
     };
-  }, [data, ready, switchAccount, signOutUser]);
+  }, [data, ready, status, switchAccount, signOutUser]);
 
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

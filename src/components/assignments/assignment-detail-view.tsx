@@ -7,6 +7,8 @@ import { useSession } from "@/components/session/session-provider";
 import type { AssignmentDataSchema, AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
 import { cn } from "@/lib/cn";
 import { CohortDataPanel } from "@/components/assignments/cohort-data-panel";
+import { SubmissionFeed } from "@/components/assignments/submission-feed";
+import { formatDueLabel } from "@/lib/assignment-buckets";
 
 const inputClass = "lc-input";
 
@@ -56,6 +58,16 @@ type SubmissionRow = {
   submittedAt: string | null;
   updatedAt?: string;
   dataTable?: DataTable | null;
+  posts?: Array<{
+    id: string;
+    version: number;
+    writeup: string | null;
+    evidenceUrl: string | null;
+    repoUrl: string | null;
+    attachments: Attachment[];
+    submittedAt: string;
+    editedAt: string | null;
+  }>;
 };
 
 type AssignmentDetail = {
@@ -165,6 +177,16 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
     reviewStatus: ReviewStatus;
     reviewComment: string | null;
   } | null>(null);
+  const [mySubmissionId, setMySubmissionId] = useState<string | null>(null);
+  const [mySubmissionStatus, setMySubmissionStatus] = useState<string | null>(
+    null,
+  );
+  const [mySubmittedAt, setMySubmittedAt] = useState<string | null>(null);
+  const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editInstructions, setEditInstructions] = useState("");
+  const [editDueAt, setEditDueAt] = useState("");
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/assignments/${assignmentId}`);
@@ -174,6 +196,18 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
       return;
     }
     setAssignment(data.assignment);
+    const a = data.assignment as AssignmentDetail;
+    setEditTitle(a.title ?? "");
+    setEditInstructions(a.instructions ?? a.description ?? "");
+    if (a.dueAt) {
+      const d = new Date(a.dueAt);
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setEditDueAt(
+        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      );
+    } else {
+      setEditDueAt("");
+    }
   }, [assignmentId]);
 
   useEffect(() => {
@@ -188,6 +222,9 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
       const data = await res.json();
       if (cancelled || !data.ok || !data.submission) return;
       const s = data.submission;
+      setMySubmissionId(s.id ?? null);
+      setMySubmissionStatus(s.status ?? null);
+      setMySubmittedAt(s.submittedAt ?? null);
       setEvidenceUrl(s.evidenceUrl ?? "");
       setRepoUrl(s.repoUrl ?? "");
       setWriteup(s.writeup ?? "");
@@ -298,10 +335,15 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
           ? ` — ${data.warnings[0]}`
           : "";
       setToast(
-        (status === "SUBMITTED" ? "Submitted for review" : "Draft saved") + warn,
-      );      window.setTimeout(() => setToast(null), 2500);
+        (status === "SUBMITTED" ? "Turned in" : "Draft saved") + warn,
+      );
+      window.setTimeout(() => setToast(null), 2500);
       if (status === "SUBMITTED") {
         setMyReview({ reviewStatus: "PENDING_REVIEW", reviewComment: null });
+        setMySubmissionStatus("SUBMITTED");
+        setMySubmittedAt(new Date().toISOString());
+        if (data.submission?.id) setMySubmissionId(data.submission.id);
+        setFeedRefreshKey((k) => k + 1);
       }
       await load();
     } catch (err) {
@@ -359,48 +401,236 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
     );
   }
 
+  const turnedInMine =
+    mySubmissionStatus === "SUBMITTED" || mySubmissionStatus === "SCORED";
+  const late =
+    Boolean(assignment.dueAt) &&
+    new Date(assignment.dueAt!).getTime() < Date.now() &&
+    !turnedInMine;
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div className="flex flex-col gap-4 border-b border-[var(--lc-line)] pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <Link
             href="/app/assignments"
-            className="text-sm text-lc-muted transition-colors duration-200 hover:text-lc-ink"
+            className="inline-flex items-center gap-1 text-sm text-lc-muted transition-colors hover:text-lc-ink"
           >
-            ← Assignments
+            <span aria-hidden>‹</span> Back
           </Link>
-          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-lc-ink">
             {assignment.title}
           </h1>
-          <p className="mt-2 max-w-2xl whitespace-pre-wrap text-[15px] leading-relaxed text-lc-muted">
-            {assignment.instructions ||
-              assignment.description ||
-              "No instructions yet."}
+          <p className="mt-2 text-sm text-lc-muted">
+            {formatDueLabel(assignment.dueAt)}
+            {materials.length > 0
+              ? ` · ${materials.length} material${materials.length === 1 ? "" : "s"}`
+              : ""}
+            {late ? " · Late" : ""}
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-lc-muted">
-            <span>
-              {assignment.dueAt
-                ? `Due ${new Date(assignment.dueAt).toLocaleString()}`
-                : "No due date"}
-            </span>
-            <span>·</span>
-            <span className="uppercase tracking-wide">{assignment.status}</span>
-            {materials.length > 0 ? (
-              <>
-                <span>·</span>
-                <span>
-                  {materials.length} material{materials.length === 1 ? "" : "s"}
-                </span>
-              </>
-            ) : null}
-          </div>
         </div>
-        {toast ? (
-          <p className="shrink-0 rounded-[10px] bg-[var(--lc-success-soft)] px-3 py-2 text-sm text-lc-success">
-            {toast}
-          </p>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {toast ? (
+            <p className="rounded-[10px] bg-[var(--lc-success-soft)] px-3 py-2 text-sm text-lc-success">
+              {toast}
+            </p>
+          ) : null}
+          {role === "student" ? (
+            <>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-xs font-medium",
+                  turnedInMine
+                    ? "bg-[var(--lc-success-soft)] text-lc-success"
+                    : "bg-black/[0.05] text-lc-muted dark:bg-white/[0.06]",
+                )}
+              >
+                {turnedInMine
+                  ? "Turned in"
+                  : late
+                    ? "Not turned in · late"
+                    : "Not turned in"}
+              </span>
+              <Button
+                variant="accent"
+                size="md"
+                disabled={busy || uploadBusy}
+                onClick={() => void submit("SUBMITTED")}
+              >
+                {busy
+                  ? "Turning in…"
+                  : late
+                    ? "Turn in late"
+                    : myReview?.reviewStatus === "NEEDS_REVISION"
+                      ? "Turn in again"
+                      : turnedInMine
+                        ? "Turn in again"
+                        : "Turn in"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={busy}
+                onClick={() => setEditing((v) => !v)}
+              >
+                {editing ? "Cancel edit" : "Edit"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={busy}
+                onClick={() => {
+                  void (async () => {
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      const nextStatus =
+                        assignment.status === "CLOSED" ? "ACTIVE" : "CLOSED";
+                      const res = await fetch(
+                        `/api/assignments/${assignmentId}`,
+                        {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ status: nextStatus }),
+                        },
+                      );
+                      const data = await res.json();
+                      if (!res.ok || !data.ok) {
+                        throw new Error(data.error ?? "Update failed");
+                      }
+                      setToast(
+                        nextStatus === "CLOSED"
+                          ? "Assignment closed"
+                          : "Assignment reopened",
+                      );
+                      window.setTimeout(() => setToast(null), 2200);
+                      await load();
+                    } catch (err) {
+                      setError(
+                        err instanceof Error ? err.message : "Update failed",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  })();
+                }}
+              >
+                {assignment.status === "CLOSED" ? "Reopen" : "Close"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                disabled={busy}
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      "Delete this assignment and all student submissions? This cannot be undone.",
+                    )
+                  ) {
+                    return;
+                  }
+                  void (async () => {
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      const res = await fetch(
+                        `/api/assignments/${assignmentId}`,
+                        { method: "DELETE" },
+                      );
+                      const data = await res.json();
+                      if (!res.ok || !data.ok) {
+                        throw new Error(data.error ?? "Delete failed");
+                      }
+                      window.location.assign("/app/assignments");
+                    } catch (err) {
+                      setError(
+                        err instanceof Error ? err.message : "Delete failed",
+                      );
+                      setBusy(false);
+                    }
+                  })();
+                }}
+              >
+                Delete
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+
+      {role === "director" && editing ? (
+        <form
+          className="space-y-3 rounded-[14px] border border-[var(--lc-line)] bg-lc-surface p-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void (async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                const res = await fetch(`/api/assignments/${assignmentId}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    title: editTitle,
+                    instructions: editInstructions,
+                    dueAt: editDueAt ? new Date(editDueAt).toISOString() : null,
+                  }),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) {
+                  throw new Error(data.error ?? "Save failed");
+                }
+                setToast("Assignment updated");
+                window.setTimeout(() => setToast(null), 2200);
+                setEditing(false);
+                await load();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Save failed");
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+        >
+          <p className="text-[15px] font-semibold text-lc-ink">Edit assignment</p>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-lc-muted">Title</span>
+            <input
+              className={inputClass}
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-lc-muted">
+              Instructions
+            </span>
+            <textarea
+              className={inputClass}
+              rows={4}
+              value={editInstructions}
+              onChange={(e) => setEditInstructions(e.target.value)}
+            />
+          </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-lc-muted">Due</span>
+            <input
+              type="datetime-local"
+              className={inputClass}
+              value={editDueAt}
+              onChange={(e) => setEditDueAt(e.target.value)}
+            />
+          </label>
+          {error ? <p className="text-sm text-lc-danger">{error}</p> : null}
+          <Button type="submit" variant="accent" disabled={busy}>
+            {busy ? "Saving…" : "Save changes"}
+          </Button>
+        </form>
+      ) : null}
 
       {role === "director" && stats ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -426,102 +656,108 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
         </div>
       ) : null}
 
-      {role === "student" && myReview?.reviewStatus ? (
-        <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-[15px] font-semibold text-lc-ink">Review status</h2>
-            <span
-              className={cn(
-                "rounded-md px-2 py-0.5 text-[11px] font-medium",
-                reviewBadgeClass(myReview.reviewStatus),
-              )}
-            >
-              {reviewLabel(myReview.reviewStatus)}
-            </span>
-          </div>
-          {myReview.reviewComment ? (
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-lc-ink">
-              {myReview.reviewComment}
+      <div
+        className={cn(
+          "grid gap-8",
+          role === "student" && "lg:grid-cols-[minmax(0,1fr)_320px]",
+        )}
+      >
+        <div className="min-w-0 space-y-6">
+          <section>
+            <h2 className="text-[15px] font-semibold text-lc-ink">
+              Instructions
+            </h2>
+            <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-lc-muted">
+              {assignment.instructions ||
+                assignment.description ||
+                "None"}
             </p>
-          ) : (
-            <p className="mt-2 text-sm text-lc-muted">
-              No professor comment yet.
-            </p>
-          )}
-        </section>
-      ) : null}
+          </section>
 
-      {materials.length > 0 ? (
-        <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5">
-          <h2 className="text-[15px] font-semibold text-lc-ink">Materials</h2>
-          <p className="mt-1 text-sm text-lc-muted">
-            Reference docs and links from your professor.
-          </p>
-          <ul className="mt-3 space-y-2">
-            {materials.map((m) => (
-              <li key={m.id}>
-                <a
-                  href={m.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-lc-accent hover:underline"
-                >
-                  {m.title}
-                </a>
-                <span className="ml-2 text-xs text-lc-muted">{m.kind}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+          {materials.length > 0 ? (
+            <section>
+              <h2 className="text-[15px] font-semibold text-lc-ink">
+                Reference materials
+              </h2>
+              <ul className="mt-3 space-y-2">
+                {materials.map((m) => (
+                  <li key={m.id}>
+                    <a
+                      href={m.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-medium text-lc-accent hover:underline"
+                    >
+                      {m.title}
+                    </a>
+                    <span className="ml-2 text-xs text-lc-muted">{m.kind}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
       {role === "student" &&
-      assignment.coachResources?.status === "found" &&
-      (assignment.coachResources.items?.length ?? 0) > 0 ? (
-        <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5">
-          <h2 className="text-[15px] font-semibold text-lc-ink">
-            Suggested reading
-          </h2>
-          <p className="mt-1 text-sm text-lc-muted">
-            Director-approved papers for this assignment — open one when you need
-            a foothold, not as homework for its own sake.
+      turnedInMine &&
+      mySubmissionId ? (
+        <section className="space-y-3">
+          <h2 className="text-[15px] font-semibold text-lc-ink">Your work</h2>
+          <p className="text-sm text-lc-muted">
+            Each turn-in is a separate post in your work log. Edit an old post
+            with its Edit control; turning in again after feedback creates a new
+            post.
           </p>
-          <ul className="mt-3 space-y-3">
-            {assignment.coachResources.items.map((item) => (
-              <li
-                key={item.url}
-                className="rounded-[10px] border border-[var(--lc-line)] px-3 py-2.5"
-              >
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-medium text-lc-ink underline-offset-2 hover:underline"
-                >
-                  {item.title}
-                </a>
-                <p className="mt-0.5 text-xs text-lc-muted">
-                  {[item.venue, item.year].filter(Boolean).join(" · ")}
-                </p>
-                {item.rationale ? (
-                  <p className="mt-1 text-xs leading-relaxed text-lc-muted">
-                    {item.rationale}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <SubmissionFeed
+            assignmentId={assignmentId}
+            submissionId={mySubmissionId}
+            studentName={studentName ?? "You"}
+            reviewStatus={myReview?.reviewStatus ?? null}
+            refreshKey={feedRefreshKey}
+            initialPosts={
+              assignment?.submissions.find((s) => s.id === mySubmissionId)
+                ?.posts
+            }
+          />
         </section>
       ) : null}
 
+      {role === "student" && assignment?.rubric?.acceptData ? (
+        <CohortDataPanel assignmentId={assignmentId} role="student" />
+      ) : null}
+
+      {role === "director" && assignment?.rubric?.acceptData ? (
+        <CohortDataPanel assignmentId={assignmentId} role="director" />
+      ) : null}
+        </div>
+
       {role === "student" ? (
-        <section className="space-y-5 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5">
+        <aside className="space-y-5 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5 lg:sticky lg:top-20 lg:self-start">
           <div>
-            <h2 className="text-[15px] font-semibold text-lc-ink">Your submission</h2>
+            <h2 className="text-[15px] font-semibold text-lc-ink">My work</h2>
             <p className="mt-1 text-sm text-lc-muted">
-              Submitting as {studentName ?? "student"}. Attach evidence files,
-              links, and notes — then submit for review.
+              {myReview?.reviewStatus === "NEEDS_REVISION"
+                ? "Professor asked for changes — turn in again to add a new post. Older attempts stay in Your work."
+                : turnedInMine
+                  ? "Update the fields and turn in again to add a new work-log post. Use Edit on a past post to change that attempt only."
+                  : "Attach files or links, then turn in from the header."}
             </p>
+            {myReview?.reviewStatus ? (
+              <div className="mt-3 space-y-1.5">
+                <p
+                  className={cn(
+                    "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                    reviewBadgeClass(myReview.reviewStatus),
+                  )}
+                >
+                  {reviewLabel(myReview.reviewStatus)}
+                </p>
+                {myReview.reviewComment ? (
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-lc-ink">
+                    {myReview.reviewComment}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           {rubric?.requireEvidenceUrl !== false ? (
@@ -795,34 +1031,35 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
             >
               Save draft
             </Button>
-            <Button
-              variant="primary"
-              disabled={busy || uploadBusy}
-              onClick={() => void submit("SUBMITTED")}
-            >
-              {busy ? "Submitting…" : "Submit for review"}
-            </Button>
+            <label className="inline-flex cursor-pointer">
+              <span className="sr-only">Upload file</span>
+              <input
+                type="file"
+                className="hidden"
+                disabled={uploadBusy}
+                onChange={(e) => {
+                  void onUpload(e.target.files?.[0] ?? null);
+                  e.target.value = "";
+                }}
+              />
+              <span className="inline-flex h-9 items-center rounded-[10px] border border-[var(--lc-line)] bg-lc-surface px-3 text-sm text-lc-ink hover:bg-black/[0.03] dark:hover:bg-white/[0.04]">
+                {uploadBusy ? "Uploading…" : "Attach"}
+              </span>
+            </label>
           </div>
-        </section>
+        </aside>
       ) : null}
-
-      {role === "student" && assignment?.rubric?.acceptData ? (
-        <CohortDataPanel assignmentId={assignmentId} role="student" />
-      ) : null}
-
-      {role === "director" && assignment?.rubric?.acceptData ? (
-        <CohortDataPanel assignmentId={assignmentId} role="director" />
-      ) : null}
+      </div>
 
       {role === "director" ? (
         <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface">
           <div className="border-b border-[var(--lc-line)] px-5 py-4">
             <h2 className="text-[15px] font-semibold text-lc-ink">
-              Student submissions
+              Student work
             </h2>
             <p className="mt-0.5 text-sm text-lc-muted">
-              Open a submission to review work, leave comments, and set status
-              (pending → needs revision → approved → done).
+              Turned-in work appears as posts — react, comment, and set review
+              status.
             </p>
           </div>
 
@@ -997,9 +1234,18 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                         )}
 
                         {turnedIn ? (
-                          <div className="space-y-3 rounded-[12px] border border-[var(--lc-line)] bg-[#fafafa] p-4">
+                          <div className="space-y-4">
+                            <SubmissionFeed
+                              assignmentId={assignmentId}
+                              submissionId={s.id}
+                              studentName={s.studentName}
+                              reviewStatus={s.reviewStatus}
+                              refreshKey={feedRefreshKey}
+                              initialPosts={s.posts}
+                            />
+                            <div className="space-y-3 rounded-[12px] border border-[var(--lc-line)] bg-black/[0.02] p-4 dark:bg-white/[0.03]">
                             <p className="text-[13px] font-semibold text-lc-ink">
-                              Professor review
+                              Review status
                             </p>
                             <label className="block space-y-1.5">
                               <span className="text-xs font-medium text-lc-muted">
@@ -1028,12 +1274,12 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                             </label>
                             <label className="block space-y-1.5">
                               <span className="text-xs font-medium text-lc-muted">
-                                Comments for student
+                                Formal review note (also in Approvals trail)
                               </span>
                               <textarea
-                                rows={4}
+                                rows={3}
                                 className={inputClass}
-                                placeholder="What looks good, what to fix, next steps..."
+                                placeholder="Optional formal note…"
                                 value={draft.reviewComment}
                                 onChange={(e) =>
                                   setReviewDrafts((prev) => ({
@@ -1061,11 +1307,12 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
                                 ? "Saving…"
                                 : "Save review"}
                             </Button>
+                            </div>
                           </div>
                         ) : (
                           <p className="text-sm text-lc-muted">
-                            Student has not submitted yet — review unlocks after
-                            submit.
+                            Student has not turned in yet — review unlocks after
+                            turn-in.
                           </p>
                         )}
                       </div>

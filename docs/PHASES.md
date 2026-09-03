@@ -27,10 +27,9 @@
 - ADR: [adr/001-structured-data-submissions.md](./adr/001-structured-data-submissions.md)
 - Verify: `npm run verify:phase-b|c|d` and `verify:brief-privacy` (Brief means gated below n=3)
 
-### Phase 6 draft -- System design docs (done as draft)
+### Phase 6 draft -- System design docs (superseded by finalize)
 
-- Index: [SYSTEM.md](./SYSTEM.md) (tenancy + ops + data pipeline) -- tables/index shape approved; keep the Brief-privacy hotfix callout honest (do not scrub).
-- **Not** a diagrammed C4 pack yet -- that is explicitly Phase 6 finalize.
+- Index: [SYSTEM.md](./SYSTEM.md) — originally draft tables/index; Brief-privacy hotfix callout kept honest.
 
 ### Phase 4 ∥ 5 — Flutter offline companion + Adaptive Coach
 
@@ -41,13 +40,9 @@
 - **Phase C (resources):** Semantic Scholar → arXiv retrieval; LLM selects only from hits; Approvals gate; `Milestone.coachResources` on approve. Verify: `npm run verify:phase-5c`
 - **Phase D (persuasive UI):** Student home pace + approved nudge; assignment suggested reading. Verify: `npm run verify:phase-5d`
 
-### Phase 6 finalize
+### Phase 6 finalize (done)
 
-- After Phase 4/5 land: **add diagrams**, do not only append table rows.
-- Minimum visual set:
-  1. **C4 context** -- LabCrew vs directors / students / external deps
-  2. **C4 container** -- web, worker, Postgres, Redis
-  3. **Sequence** -- weekly ops pipeline (`POST /api/ops/runs` → BullMQ → Pulse→Referee→Coach→Clerk → Brief), matching SYSTEM §4
-- Mermaid (or equivalent) in `SYSTEM.md` or `docs/diagrams/` is enough; keep the index prose.
+- Mermaid in [SYSTEM.md](./SYSTEM.md): C4 context, C4 container, weekly-ops sequence, structured-data privacy sequence.
+- Status line on SYSTEM.md set to **Finalized**; Brief-privacy hotfix callout retained.
 
 ### Phase 7 — Usability study (human track, parallel)

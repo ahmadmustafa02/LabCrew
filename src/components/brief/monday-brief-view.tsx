@@ -315,16 +315,27 @@ export function MondayBriefView() {
                     Next approvals
                   </p>
                   <ul className="mt-3 space-y-2">
-                    {brief.pendingApprovals.slice(0, 3).map((draft) => (
+                    {brief.pendingApprovals.slice(0, 3).map((draft) => {
+                      const preview = (() => {
+                        const raw = draft.body?.trim() ?? "";
+                        if (raw.startsWith("{")) {
+                          return "Draft waiting in Approvals";
+                        }
+                        return raw.length > 120
+                          ? `${raw.slice(0, 120)}…`
+                          : raw;
+                      })();
+                      return (
                       <li key={draft.id} className="text-sm text-lc-muted">
                         <span className="font-medium text-lc-ink">
                           {draft.targetName ?? draft.title}
                         </span>
-                        <span className="mt-0.5 line-clamp-1 block">
-                          {draft.body}
+                        <span className="mt-0.5 line-clamp-2 block">
+                          {preview}
                         </span>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                   <div className="mt-4">
                     <Link href="/app/approvals">

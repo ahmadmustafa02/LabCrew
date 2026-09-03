@@ -275,13 +275,18 @@ export function MeetingsView() {
               : "No meeting invites yet."}
           </p>
         ) : (
-          upcoming.map((m) => (
+          upcoming.map((m) => {
+            const yes = m.recipients.filter((r) => r.rsvp === "YES").length;
+            const no = m.recipients.filter((r) => r.rsvp === "NO").length;
+            const maybe = m.recipients.filter((r) => r.rsvp === "MAYBE").length;
+            const pending = m.recipients.filter((r) => !r.rsvp).length;
+            return (
             <article
               key={m.id}
               className="rounded-[14px] border border-[var(--lc-line)] bg-lc-surface p-5 transition-shadow duration-200 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)]"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+                <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-semibold tracking-tight">
                     {m.title}
                   </h2>
@@ -306,6 +311,28 @@ export function MeetingsView() {
                       Join meeting →
                     </a>
                   ) : null}
+                  {isDirector && m.recipients.length > 0 ? (
+                    <div className="mt-3 space-y-1.5">
+                      <p className="text-xs font-medium text-lc-muted">
+                        RSVPs · {yes} going · {maybe} maybe · {no} can&apos;t ·{" "}
+                        {pending} no response
+                      </p>
+                      <ul className="max-h-28 space-y-0.5 overflow-y-auto text-xs text-lc-muted">
+                        {m.recipients.map((r) => (
+                          <li key={r.memberId}>
+                            {r.name} —{" "}
+                            {r.rsvp === "YES"
+                              ? "Going"
+                              : r.rsvp === "NO"
+                                ? "Can't"
+                                : r.rsvp === "MAYBE"
+                                  ? "Maybe"
+                                  : "No response"}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
 
                 {!isDirector ? (
@@ -321,10 +348,43 @@ export function MeetingsView() {
                       </Button>
                     ))}
                   </div>
-                ) : null}
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!window.confirm(`Cancel meeting “${m.title}”?`)) return;
+                      void (async () => {
+                        setBusy(true);
+                        try {
+                          const res = await fetch(`/api/meetings/${m.id}`, {
+                            method: "DELETE",
+                          });
+                          const data = await res.json();
+                          if (!res.ok || !data.ok) {
+                            throw new Error(data.error ?? "Cancel failed");
+                          }
+                          setToast("Meeting cancelled");
+                          window.setTimeout(() => setToast(null), 2000);
+                          await load();
+                        } catch (err) {
+                          setError(
+                            err instanceof Error ? err.message : "Cancel failed",
+                          );
+                        } finally {
+                          setBusy(false);
+                        }
+                      })();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
               </div>
             </article>
-          ))
+            );
+          })
         )}
       </div>
       </SoftReveal>

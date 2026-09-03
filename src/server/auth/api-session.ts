@@ -2,7 +2,6 @@ import { MemberRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import type { AppRole } from "@/auth.config";
-import { getPrisma } from "@/lib/db";
 
 /**
  * Legacy session helpers for routes not yet migrated to lab-scope.
@@ -35,44 +34,33 @@ function forbidden(message = "Not allowed") {
   return NextResponse.json({ ok: false, error: message }, { status: 403 });
 }
 
-/** Load authenticated user + primary program membership from DB (not JWT alone). */
+/** Load authenticated user + active lab membership from DB (respects JWT memberId). */
 export async function getApiSession(): Promise<ApiSession | null> {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
 
-  const prisma = getPrisma();
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      members: {
-        include: {
-          program: { include: { organization: true } },
-        },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-    },
-  });
-
-  const membership = user?.members[0];
-  if (!user || !membership) return null;
-
-  const appRole: AppRole =
-    membership.role === MemberRole.STUDENT ? "student" : "director";
+  const { resolveActiveMembership } = await import(
+    "@/server/auth/active-membership"
+  );
+  const active = await resolveActiveMembership(
+    userId,
+    session.user?.memberId ?? null,
+  );
+  if (!active) return null;
 
   return {
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-    appRole,
+    userId: active.user.id,
+    email: active.user.email,
+    name: active.user.name,
+    appRole: active.appRole,
     membership: {
-      id: membership.id,
-      role: membership.role,
-      programId: membership.programId,
-      organizationId: membership.organizationId,
-      programName: membership.program.name,
-      organizationSlug: membership.program.organization.slug,
+      id: active.membership.id,
+      role: active.membership.role,
+      programId: active.membership.programId,
+      organizationId: active.membership.organizationId,
+      programName: active.membership.programName,
+      organizationSlug: active.membership.organizationSlug,
     },
   };
 }

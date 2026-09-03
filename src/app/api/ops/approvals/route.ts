@@ -13,9 +13,25 @@ export async function GET() {
     const programId = gate.session.membership.programId;
     const prisma = getPrisma();
 
+    // Paper-search resource drafts are retired — clear any leftover pending ones.
+    await prisma.approvalItem.updateMany({
+      where: {
+        programId,
+        status: ApprovalStatus.PENDING,
+        kind: "resources",
+      },
+      data: {
+        status: ApprovalStatus.REJECTED,
+        decidedAt: new Date(),
+        deliveryStatus: "skipped",
+        deliveryError: "Resource search feature removed",
+      },
+    });
+
     const items = await prisma.approvalItem.findMany({
       where: {
         programId,
+        NOT: { kind: "resources" },
         OR: [
           { status: ApprovalStatus.PENDING },
           {

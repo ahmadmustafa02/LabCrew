@@ -418,7 +418,7 @@ export async function executeWeeklyOps(runId: string) {
                 "Next milestone expectations",
               ]
             : [
-                `Unblock ${names[0] ?? "at-risk students"} first`,
+                `Check in with ${names[0] ?? "at-risk students"} first`,
                 "Approve or edit pending nudges",
                 "Confirm Week deliverable bar for everyone else",
               ];

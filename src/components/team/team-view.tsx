@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CardListSkeleton } from "@/components/ui/skeleton";
 
@@ -18,8 +19,18 @@ type Student = {
   email: string;
 };
 
+function roleLabel(role: string) {
+  if (role === "STUDENT") return "Student";
+  if (role === "MENTOR") return "Mentor";
+  if (role === "ADMIN") return "Admin";
+  return role;
+}
+
 export function TeamView() {
   const [email, setEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"STUDENT" | "MENTOR" | "ADMIN">(
+    "STUDENT",
+  );
   const [invites, setInvites] = useState<Invite[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [ready, setReady] = useState(false);
@@ -59,12 +70,13 @@ export function TeamView() {
       const res = await fetch("/api/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role: "STUDENT" }),
+        body: JSON.stringify({ email, role: inviteRole }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Invite failed");
       setEmail("");
-      setToast(`Invite created for ${data.invite.email}`);
+      setInviteRole("STUDENT");
+      setToast(`Invite link ready for ${data.invite.email}`);
       window.setTimeout(() => setToast(null), 2500);
       await load();
     } catch (err) {
@@ -81,6 +93,24 @@ export function TeamView() {
     window.setTimeout(() => setCopiedId(null), 2000);
   }
 
+  async function revokeInvite(invite: Invite) {
+    if (!window.confirm(`Revoke invite for ${invite.email}?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/invites/${invite.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Revoke failed");
+      setToast("Invite revoked");
+      window.setTimeout(() => setToast(null), 2000);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Revoke failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -90,8 +120,7 @@ export function TeamView() {
             Students & invites
           </h1>
           <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-lc-muted">
-            Invite people by email. They set their own password and join your
-            program — data stays in your org.
+            Create an invite link, copy it, and send it to the student yourself.
           </p>
           {error ? <p className="mt-2 text-sm text-lc-danger">{error}</p> : null}
         </div>
@@ -107,18 +136,32 @@ export function TeamView() {
         className="flex flex-col gap-3 rounded-[16px] border border-[var(--lc-line)] bg-lc-surface p-5 sm:flex-row sm:items-end"
       >
         <label className="block min-w-0 flex-1 space-y-1.5">
-          <span className="text-xs font-medium text-lc-muted">Student email</span>
+          <span className="text-xs font-medium text-lc-muted">Email</span>
           <input
             className="lc-input"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="student@university.edu"
+            placeholder="person@university.edu"
             required
           />
         </label>
+        <label className="block space-y-1.5 sm:w-44">
+          <span className="text-xs font-medium text-lc-muted">Role</span>
+          <select
+            className="lc-input"
+            value={inviteRole}
+            onChange={(e) =>
+              setInviteRole(e.target.value as "STUDENT" | "MENTOR" | "ADMIN")
+            }
+          >
+            <option value="STUDENT">Student</option>
+            <option value="MENTOR">Mentor (staff)</option>
+            <option value="ADMIN">Admin (co-director)</option>
+          </select>
+        </label>
         <Button type="submit" variant="accent" disabled={busy || !email.trim()}>
-          {busy ? "Sending…" : "Create invite"}
+          {busy ? "Creating link…" : "Create invite link"}
         </Button>
       </form>
 
@@ -131,7 +174,9 @@ export function TeamView() {
             <CardListSkeleton count={2} />
           </div>
         ) : invites.length === 0 ? (
-          <p className="px-5 py-8 text-sm text-lc-muted">No open invites.</p>
+          <p className="px-5 py-8 text-sm text-lc-muted">
+            No open invites. Create a link above, then copy it to share.
+          </p>
         ) : (
           <ul className="divide-y divide-[var(--lc-line)]">
             {invites.map((invite) => (
@@ -143,17 +188,28 @@ export function TeamView() {
                   <p className="text-sm font-medium text-lc-ink">{invite.email}</p>
                   <p className="mt-0.5 text-xs text-lc-muted">
                     Expires {new Date(invite.expiresAt).toLocaleDateString()} ·{" "}
-                    {invite.role}
+                    {roleLabel(invite.role)}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void copyLink(invite)}
-                >
-                  {copiedId === invite.id ? "Copied" : "Copy join link"}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void copyLink(invite)}
+                  >
+                    {copiedId === invite.id ? "Copied" : "Copy join link"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void revokeInvite(invite)}
+                  >
+                    Revoke
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -170,7 +226,11 @@ export function TeamView() {
           </div>
         ) : students.length === 0 ? (
           <p className="px-5 py-8 text-sm text-lc-muted">
-            No students yet. Send an invite to start the cohort.
+            No students yet.{" "}
+            <Link href="#top" className="text-lc-accent hover:underline">
+              Create an invite
+            </Link>{" "}
+            to start the cohort.
           </p>
         ) : (
           <ul className="divide-y divide-[var(--lc-line)]">

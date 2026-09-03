@@ -1,0 +1,50 @@
+sequenceDiagram
+  autonumber
+  actor Student
+  actor Director
+  participant Web as web API
+  participant PG as Postgres
+  participant Clean as data-quality / cohort-stats
+
+  Student->>Web: POST /api/assignments/id/submit CSV or cells
+  Web->>Web: requireLabStudent + lab-scoped milestone
+
+  alt director dataSchema present AND headers/types invalid
+    Web-->>Student: 400 reject clear error
+  else valid or freeform
+    Web->>PG: upsert Submission + SubmissionDataPoint rows
+
+    Web->>Clean: duplicate detection row fingerprint / resubmit
+    alt duplicate_row or duplicate_resubmission
+      Clean-->>Web: flag duplicate_* still store, do not reject
+    else unique rows
+      Clean-->>Web: no duplicate flags
+    end
+
+    Web->>Clean: IQR Tukey fences
+    alt numeric sample size less than IQR_MIN_SAMPLE 4
+      Clean-->>Web: outlierCheck insufficient_sample no IQR flags
+    else sample at least 4
+      Clean-->>Web: flag outliers still accepted
+    end
+
+    Web->>PG: persist flags
+    Web-->>Student: 200 submission + dataTable
+  end
+
+  Note over Student,Director: Later reads
+
+  Director->>Web: GET cohort-data
+  Web->>PG: all lab cells for milestone
+  Web-->>Director: bins + flagged table + peer rows
+
+  Student->>Web: GET cohort-data
+  Web->>PG: lab cells then filter
+  Web->>Clean: contributorCount vs STUDENT_AGGREGATE_MIN_N 3
+  alt contributors less than 3
+    Web-->>Student: own values only, aggregates insufficient_cohort, peerRawRows null
+  else contributors at least 3
+    Web-->>Student: own values + mean/median, peerRawRows null
+  end
+
+  Note over Web,PG: Monday Brief Clerk uses the same floors - never prints means when n less than 3

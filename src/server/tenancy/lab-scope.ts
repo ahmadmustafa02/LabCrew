@@ -52,36 +52,27 @@ function toAppRole(role: MemberRole): AppRole {
   return role === MemberRole.STUDENT ? "student" : "director";
 }
 
-async function loadMembershipForUser(userId: string): Promise<{
+async function loadMembershipForUser(
+  userId: string,
+  preferredMemberId?: string | null,
+): Promise<{
   user: { id: string; email: string; name: string };
   membership: LabMembership;
 } | null> {
-  const prisma = getPrisma();
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      members: {
-        include: {
-          program: { include: { organization: true } },
-        },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-    },
-  });
-
-  const membership = user?.members[0];
-  if (!user || !membership) return null;
-
+  const { resolveActiveMembership } = await import(
+    "@/server/auth/active-membership"
+  );
+  const active = await resolveActiveMembership(userId, preferredMemberId);
+  if (!active) return null;
   return {
-    user: { id: user.id, email: user.email, name: user.name },
+    user: active.user,
     membership: {
-      id: membership.id,
-      role: membership.role,
-      programId: membership.programId,
-      organizationId: membership.organizationId,
-      programName: membership.program.name,
-      organizationSlug: membership.program.organization.slug,
+      id: active.membership.id,
+      role: active.membership.role,
+      programId: active.membership.programId,
+      organizationId: active.membership.organizationId,
+      programName: active.membership.programName,
+      organizationSlug: active.membership.organizationSlug,
     },
   };
 }
@@ -167,7 +158,8 @@ export async function resolveLabContext(
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return null;
-  const loaded = await loadMembershipForUser(userId);
+  const preferredMemberId = session.user?.memberId;
+  const loaded = await loadMembershipForUser(userId, preferredMemberId);
   if (!loaded) return null;
   return toLabContext(loaded, "session");
 }

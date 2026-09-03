@@ -23,6 +23,7 @@ export async function findMilestoneDetailInLab(
       submissions: {
         include: {
           member: { include: { user: true } },
+          posts: { orderBy: { version: "asc" } },
         },
         orderBy: { updatedAt: "desc" },
       },

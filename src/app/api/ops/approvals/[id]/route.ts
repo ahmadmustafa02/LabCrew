@@ -4,10 +4,6 @@ import { getPrisma } from "@/lib/db";
 import { requireLabDirector } from "@/server/tenancy/lab-scope";
 import { findApprovalInLab } from "@/server/tenancy/lab-repo";
 import { deliverNudge } from "@/server/email/deliver-nudge";
-import {
-  RESOURCE_KIND,
-  applyApprovedResources,
-} from "@/server/coach/resource-suggest";
 import { createNotifications } from "@/server/notifications/create";
 
 export const runtime = "nodejs";
@@ -47,6 +43,25 @@ export async function PATCH(request: Request, { params }: Params) {
       );
     }
 
+    // Resource paper-search drafts are retired.
+    if (existing.kind === "resources") {
+      const prisma = getPrisma();
+      const updated = await prisma.approvalItem.update({
+        where: { id },
+        data: {
+          status: ApprovalStatus.REJECTED,
+          decidedAt: new Date(),
+          deliveryStatus: "skipped",
+          deliveryError: "Resource search feature removed",
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        approval: serialize(updated),
+        delivery: null,
+      });
+    }
+
     const nextBody =
       typeof input.body === "string" && input.body.trim().length > 0
         ? input.body.trim()
@@ -82,33 +97,6 @@ export async function PATCH(request: Request, { params }: Params) {
 
     let delivery = null;
     if (action === "approve") {
-      // Phase C resource drafts: attach to milestone; do not email students.
-      if (existing.kind === RESOURCE_KIND) {
-        const applied = await applyApprovedResources({
-          labId: gate.ctx.labId,
-          body: updated.body,
-        });
-        const withDelivery = await prisma.approvalItem.update({
-          where: { id },
-          data: {
-            deliveryStatus: applied.ok ? "applied" : "failed",
-            deliveryChannel: "milestone",
-            deliveryError: applied.ok ? null : applied.error,
-            deliveredAt: new Date(),
-          },
-        });
-        return NextResponse.json({
-          ok: true,
-          approval: serialize(withDelivery),
-          delivery: {
-            ok: applied.ok,
-            status: applied.ok ? "applied" : "failed",
-            channel: "milestone",
-            error: applied.ok ? null : applied.error,
-          },
-        });
-      }
-
       const result = await deliverNudge({
         programId: updated.programId,
         toName: updated.targetName,
@@ -133,7 +121,6 @@ export async function PATCH(request: Request, { params }: Params) {
         },
       });
 
-      // Phase D — surface approved nudge in student portal (own only)
       if (result.ok && updated.targetEmail) {
         const student = await prisma.member.findFirst({
           where: {

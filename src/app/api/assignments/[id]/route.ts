@@ -7,8 +7,6 @@ import type {
   MaterialItem,
 } from "@/lib/assignment-types";
 import { groupCellsToTable, parseDataSchema } from "@/server/data/submission-data";
-import { draftResourceSuggestionsForMilestone } from "@/server/coach/resource-suggest";
-import { coachResourcesForStudent } from "@/server/coach/student-coach";
 import {
   requireLabDirector,
   requireLabScope,
@@ -92,10 +90,8 @@ export async function GET(request: Request, { params }: Params) {
         materials: assignment.materials,
         rubric: assignment.rubric,
         dataSchema: parseDataSchema(assignment.dataSchema),
-        // Phase D: students see approved reading list only; directors always see stored JSON.
-        coachResources: isDirector
-          ? (assignment.coachResources ?? null)
-          : coachResourcesForStudent(assignment.coachResources),
+        // Reading-list / coachResources search removed — directors attach materials manually.
+        coachResources: null,
         dueAt: assignment.dueAt,
         status: assignment.status,
         stats: {
@@ -123,6 +119,16 @@ export async function GET(request: Request, { params }: Params) {
           submittedAt: s.submittedAt,
           updatedAt: s.updatedAt,
           dataTable: groupCellsToTable(cellsBySubmission.get(s.id) ?? []),
+          posts: (s.posts ?? []).map((p) => ({
+            id: p.id,
+            version: p.version,
+            writeup: p.writeup,
+            evidenceUrl: p.evidenceUrl,
+            repoUrl: p.repoUrl,
+            attachments: asAttachments(p.attachments),
+            submittedAt: p.submittedAt.toISOString(),
+            editedAt: p.editedAt?.toISOString() ?? null,
+          })),
         })),
       },
     });
@@ -157,7 +163,6 @@ export async function PATCH(request: Request, { params }: Params) {
       materials?: MaterialItem[];
       rubric?: AssignmentRubric;
       dataSchema?: AssignmentDataSchema | null;
-      refreshResources?: boolean;
     };
 
     const title =
@@ -168,9 +173,6 @@ export async function PATCH(request: Request, { params }: Params) {
       body.description === undefined
         ? existing.description
         : body.description?.trim() || null;
-
-    const topicChanged =
-      title !== existing.title || description !== existing.description;
 
     const dataSchema =
       body.dataSchema === undefined
@@ -211,34 +213,43 @@ export async function PATCH(request: Request, { params }: Params) {
       },
     });
 
-    let resourceDraft: { approvalId: string; status: string } | null = null;
-    if (topicChanged || body.refreshResources) {
-      try {
-        const drafted = await draftResourceSuggestionsForMilestone({
-          labId: gate.ctx.labId,
-          programId: assignment.programId,
-          milestoneId: assignment.id,
-          title: assignment.title,
-          description: assignment.description,
-        });
-        resourceDraft = {
-          approvalId: drafted.approvalId,
-          status: drafted.payload.status,
-          reusedPending: drafted.reusedPending,
-          searchCacheHit: drafted.searchCacheHit ?? false,
-        };
-      } catch (err) {
-        console.warn("[resources] draft on edit failed", err);
-      }
-    }
-
-    return NextResponse.json({ ok: true, assignment, resourceDraft });
+    return NextResponse.json({ ok: true, assignment });
   } catch (error) {
     return NextResponse.json(
       {
         ok: false,
         error:
           error instanceof Error ? error.message : "Failed to update assignment",
+      },
+      { status: 503 },
+    );
+  }
+}
+
+export async function DELETE(request: Request, { params }: Params) {
+  try {
+    const gate = await requireLabDirector(request);
+    if ("error" in gate) return gate.error;
+
+    const { id } = await params;
+    const existing = await findMilestoneInLab(gate.ctx.labId, id);
+    if (!existing) {
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
+    if (existing.programId !== gate.ctx.membership.programId) {
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
+
+    const prisma = getPrisma();
+    await prisma.milestone.delete({ where: { id } });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          error instanceof Error ? error.message : "Failed to delete assignment",
       },
       { status: 503 },
     );
