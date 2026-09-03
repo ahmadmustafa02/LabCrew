@@ -228,22 +228,27 @@ describe("lab-repo: positive A→A and negative A↛B", () => {
     );
     log(`  PASS  + progress framed only → "${progress.headline}"`);
 
-    // Milestone resources: A student sees A approved list; not B's via wrong lab
+    // Paper-search coachResources retired — API must not leak seeded JSON to clients.
     const mileA = await findMilestoneInLab(
       fixture.labA.organizationId,
       fixture.labA.milestoneId,
     );
+    assert.ok(mileA, "A can load own milestone");
+    // Helper still shapes stored JSON if present (DB may retain legacy rows).
     const resA = coachResourcesForStudent(mileA?.coachResources);
-    assert.ok(resA?.items?.length);
-    assert.match(resA!.items[0].rationale, /lab-secret-resource-iso-lab-a/);
-    log("  PASS  + A approved coachResources shaped for student");
+    if (resA?.items?.length) {
+      assert.match(resA.items[0].rationale, /lab-secret-resource-iso-lab-a/);
+      log("  PASS  + legacy coachResources helper still lab-shaped when present");
+    } else {
+      log("  PASS  + no coachResources exposed via helper (feature retired)");
+    }
 
     const mileBAsA = await findMilestoneInLab(
       fixture.labA.organizationId,
       fixture.labB.milestoneId,
     );
     assert.equal(mileBAsA, null, "A cannot load B milestone");
-    log("  PASS  - A cannot load B milestone for resources");
+    log("  PASS  - A cannot load B milestone");
 
     // HTTP: student A bearer — portal + assignment + engagement deny
     const stuTok = await issueApiAccessToken({
@@ -297,11 +302,12 @@ describe("lab-repo: positive A→A and negative A↛B", () => {
         };
       };
       assert.equal(asgRes.status, 200);
-      assert.match(
-        asgJson.assignment?.coachResources?.items?.[0]?.rationale ?? "",
-        /lab-secret-resource-iso-lab-a/,
+      assert.equal(
+        asgJson.assignment?.coachResources ?? null,
+        null,
+        "assignment GET must not return coachResources (paper search removed)",
       );
-      log("  PASS  + assignment GET returns approved resources for student A");
+      log("  PASS  + assignment GET returns null coachResources");
 
       const crossAsg = await assignmentGet(
         new Request(
