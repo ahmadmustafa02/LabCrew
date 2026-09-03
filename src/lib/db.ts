@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 /** Bump when Prisma schema fields change so HMR drops a stale client. */
-const PRISMA_SCHEMA_REV = 5;
+const PRISMA_SCHEMA_REV = 9;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -57,6 +57,9 @@ export function getPrisma() {
     "programOpsSchedule",
     "apiAccessToken",
     "submissionDataPoint",
+    "submissionComment",
+    "submissionReaction",
+    "submissionPost",
   ] as const;
 
   const stale =
@@ -73,11 +76,15 @@ export function getPrisma() {
     globalForPrisma.prismaSchemaRev = PRISMA_SCHEMA_REV;
   }
 
-  const client = globalForPrisma.prisma!;
+  const client = globalForPrisma.prisma as PrismaClient & Record<string, unknown>;
   // Last-resort: if still missing (rare HMR race), rebuild once more.
-  if (typeof (client as PrismaClient & Record<string, unknown>).announcement === "undefined") {
+  if (
+    typeof client.announcement === "undefined" ||
+    typeof client.submissionPost === "undefined"
+  ) {
     void client.$disconnect().catch(() => undefined);
     globalForPrisma.prisma = createPrismaClient();
+    globalForPrisma.prismaSchemaRev = PRISMA_SCHEMA_REV;
   }
 
   return globalForPrisma.prisma!;

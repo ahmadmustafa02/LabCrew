@@ -9,8 +9,9 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    const userId = session?.user?.id;
-    if (!userId) {
+    let userId = session?.user?.id;
+    const email = session?.user?.email?.trim().toLowerCase();
+    if (!userId && !email) {
       return NextResponse.json({ ok: false, error: "Sign in required" }, { status: 401 });
     }
 
@@ -29,14 +30,43 @@ export async function POST(request: Request) {
     }
 
     const prisma = getPrisma();
+
+    // Resolve the real User row (JWT sub can be a Google subject briefly)
+    if (userId) {
+      const byId = await prisma.user.findUnique({ where: { id: userId } });
+      if (!byId && email) {
+        const byEmail = await prisma.user.findUnique({ where: { email } });
+        userId = byEmail?.id;
+      }
+    } else if (email) {
+      const byEmail = await prisma.user.findUnique({ where: { email } });
+      userId = byEmail?.id;
+    }
+
+    if (!userId) {
+      return NextResponse.json(
+        { ok: false, error: "User record missing — sign out and try Google again" },
+        { status: 401 },
+      );
+    }
+
     const existingMember = await prisma.member.findFirst({
       where: { userId },
+      include: {
+        organization: true,
+        program: true,
+      },
     });
+    // Idempotent: first click often succeeds but soft-nav races the session
+    // cookie and leaves the user on this page — treat as success so retry works.
     if (existingMember) {
-      return NextResponse.json(
-        { ok: false, error: "You already belong to a program" },
-        { status: 409 },
-      );
+      return NextResponse.json({
+        ok: true,
+        alreadyOnboarded: true,
+        organization: existingMember.organization,
+        program: existingMember.program,
+        memberId: existingMember.id,
+      });
     }
 
     let slug = slugify(orgName);
@@ -65,6 +95,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      alreadyOnboarded: false,
       organization: result.org,
       program: result.program,
       memberId: result.member.id,

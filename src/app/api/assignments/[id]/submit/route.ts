@@ -233,6 +233,15 @@ export async function POST(request: Request, { params }: Params) {
         }
       }
 
+      const alreadyPublished =
+        existing != null &&
+        (existing.status === SubmissionStatus.SUBMITTED ||
+          existing.status === SubmissionStatus.SCORED ||
+          existing.reviewStatus === ReviewStatus.NEEDS_REVISION ||
+          existing.reviewStatus === ReviewStatus.APPROVED ||
+          existing.reviewStatus === ReviewStatus.DONE ||
+          existing.reviewStatus === ReviewStatus.PENDING_REVIEW);
+
       const row = await tx.submission.upsert({
         where: {
           milestoneId_memberId: { milestoneId, memberId },
@@ -257,7 +266,10 @@ export async function POST(request: Request, { params }: Params) {
           checklist: data.checklist,
           attachments: data.attachments,
           status: data.status,
-          submittedAt: data.submittedAt,
+          submittedAt:
+            status === SubmissionStatus.SUBMITTED
+              ? new Date()
+              : existing?.submittedAt ?? null,
           reviewStatus: data.reviewStatus,
           reviewComment: data.reviewComment,
           reviewedAt: data.reviewedAt,
@@ -303,14 +315,53 @@ export async function POST(request: Request, { params }: Params) {
         await recomputeIqrFlagsForMilestone(tx, labId, milestoneId);
       }
 
-      return row;
+      return { row, wasPublished: alreadyPublished };
     });
 
-    const cells = await findDataPointsForSubmissionInLab(labId, submission.id);
+    let createdPostId: string | null = null;
+    // Create work-log posts outside the interactive tx (avoids stale HMR tx delegates).
+    if (status === SubmissionStatus.SUBMITTED) {
+      const db = getPrisma();
+      const last = await db.submissionPost.findFirst({
+        where: {
+          submissionId: submission.row.id,
+          organizationId: labId,
+        },
+        orderBy: { version: "desc" },
+        select: { version: true },
+      });
+      const nextVersion = (last?.version ?? 0) + 1;
+      const post = await db.submissionPost.create({
+        data: {
+          organizationId: labId,
+          submissionId: submission.row.id,
+          version: nextVersion,
+          evidenceUrl: data.evidenceUrl,
+          repoUrl: data.repoUrl,
+          writeup: data.writeup,
+          checklist: data.checklist,
+          attachments: data.attachments,
+          submittedAt: new Date(),
+        },
+      });
+      createdPostId = post.id;
+      if (submission.wasPublished && nextVersion > 1) {
+        warnings.push(
+          `Work attempt #${nextVersion} posted — earlier attempts stay in your work log.`,
+        );
+      }
+    }
+
+    const cells = await findDataPointsForSubmissionInLab(
+      labId,
+      submission.row.id,
+    );
 
     return NextResponse.json({
       ok: true,
-      submission,
+      submission: submission.row,
+      postId: createdPostId,
+      newPost: Boolean(createdPostId),
       dataTable: groupCellsToTable(cells),
       warnings: warnings.length ? warnings : undefined,
     });

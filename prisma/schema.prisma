@@ -94,6 +94,9 @@ model Organization {
   opsSchedules           ProgramOpsSchedule[]
   apiAccessTokens        ApiAccessToken[]
   engagementScores       EngagementScore[]
+  submissionComments     SubmissionComment[]
+  submissionReactions    SubmissionReaction[]
+  submissionPosts        SubmissionPost[]
 }
 
 model Program {
@@ -192,6 +195,8 @@ model Member {
   announcementRecipients AnnouncementRecipient[]
   apiAccessTokens ApiAccessToken[]
   engagementScores EngagementScore[]
+  submissionComments  SubmissionComment[]
+  submissionReactions SubmissionReaction[]
 
   @@unique([programId, userId])
   @@index([organizationId])
@@ -255,11 +260,79 @@ model Submission {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   dataPoints     SubmissionDataPoint[]
+  posts          SubmissionPost[]
 
   @@unique([milestoneId, memberId])
   @@index([organizationId])
   @@index([memberId])
   @@index([reviewStatus])
+}
+
+/// Immutable-ish work log entry. Resubmits after review create a new post;
+/// students can still edit a specific post via its edit control.
+model SubmissionPost {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  submissionId   String
+  submission     Submission   @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  /// 1-based attempt number for this student/assignment
+  version        Int
+  evidenceUrl    String?
+  repoUrl        String?
+  writeup        String?
+  checklist      Json?
+  attachments    Json?
+  submittedAt    DateTime
+  editedAt       DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  comments       SubmissionComment[]
+  reactions      SubmissionReaction[]
+
+  @@unique([submissionId, version])
+  @@index([organizationId])
+  @@index([submissionId, submittedAt])
+}
+
+/// Threaded feedback on a work post (social style).
+model SubmissionComment {
+  id               String   @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  postId           String
+  post             SubmissionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorMemberId   String
+  author           Member   @relation(fields: [authorMemberId], references: [id], onDelete: Cascade)
+  /// Null = top-level comment on the post; set = reply to another comment
+  parentId         String?
+  parent           SubmissionComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          SubmissionComment[] @relation("CommentReplies")
+  body             String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([postId, createdAt])
+  @@index([parentId])
+}
+
+/// Emoji reaction on a work post (one emoji type per member).
+model SubmissionReaction {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  postId         String
+  post           SubmissionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// like | celebrate | insightful | curious
+  emoji          String
+  createdAt      DateTime @default(now())
+
+  @@unique([postId, memberId, emoji])
+  @@index([organizationId])
+  @@index([postId])
 }
 
 enum DataValueType {

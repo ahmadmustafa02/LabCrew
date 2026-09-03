@@ -16,6 +16,9 @@ export const authConfig = {
         token.role = user.role;
         token.memberId = user.memberId;
         token.programName = user.programName;
+        token.organizationName = (
+          user as { organizationName?: string }
+        ).organizationName;
         token.needsOnboarding = Boolean(
           (user as { needsOnboarding?: boolean }).needsOnboarding,
         );
@@ -34,6 +37,7 @@ export const authConfig = {
         role: AppRole;
         memberId?: string;
         programName?: string;
+        organizationName?: string;
         needsOnboarding?: boolean;
       };
       user.id = token.sub ?? "";
@@ -42,6 +46,10 @@ export const authConfig = {
         typeof token.memberId === "string" ? token.memberId : undefined;
       user.programName =
         typeof token.programName === "string" ? token.programName : undefined;
+      user.organizationName =
+        typeof token.organizationName === "string"
+          ? token.organizationName
+          : undefined;
       user.needsOnboarding = Boolean(token.needsOnboarding);
       return session;
     },

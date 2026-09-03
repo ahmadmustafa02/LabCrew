@@ -201,11 +201,54 @@ export function AnnouncementsView() {
                 key={a.id}
                 className="rounded-[14px] border border-[var(--lc-line)] bg-lc-surface p-5"
               >
-                <h2 className="text-lg font-semibold tracking-tight">{a.title}</h2>
-                <p className="mt-1 text-sm text-lc-muted">
-                  {new Date(a.createdAt).toLocaleString()} · {a.createdByName}
-                  {isDirector ? ` · ${a.recipientCount} recipients` : ""}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold tracking-tight">
+                      {a.title}
+                    </h2>
+                    <p className="mt-1 text-sm text-lc-muted">
+                      {new Date(a.createdAt).toLocaleString()} · {a.createdByName}
+                      {isDirector ? ` · ${a.recipientCount} recipients` : ""}
+                    </p>
+                  </div>
+                  {isDirector ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        if (!window.confirm(`Delete “${a.title}”?`)) return;
+                        void (async () => {
+                          setBusy(true);
+                          try {
+                            const res = await fetch(
+                              `/api/announcements/${a.id}`,
+                              { method: "DELETE" },
+                            );
+                            const data = await res.json();
+                            if (!res.ok || !data.ok) {
+                              throw new Error(data.error ?? "Delete failed");
+                            }
+                            setToast("Announcement deleted");
+                            window.setTimeout(() => setToast(null), 2000);
+                            await load();
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Delete failed",
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        })();
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
+                </div>
                 <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed">
                   {a.body}
                 </p>

@@ -56,7 +56,7 @@ const markdown = briefToMarkdown({
   submissionRate: 40,
   briefing,
   agenda: [
-    "Unblock Ayesha first",
+    "Check in with Ayesha first",
     "Approve or edit pending nudges",
     "Review flagged structured-data outliers on the assignment",
   ],

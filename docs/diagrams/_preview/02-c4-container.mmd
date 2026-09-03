@@ -1,0 +1,27 @@
+flowchart LR
+  director["Director"]
+  student["Student"]
+  mobile["Mobile / API client"]
+
+  subgraph LabCrew["LabCrew"]
+    web["web<br/>Next.js 16<br/>UI + API<br/>requireLabScope"]
+    worker["worker<br/>BullMQ consumer<br/>Dispatcher→Pulse→Referee→Coach→Clerk<br/>Redis heartbeat"]
+    postgres[("Postgres 16<br/>tenancy, submissions,<br/>AgentRun/Step, Approvals,<br/>EngagementScore, StoredFile,<br/>ApiAccessToken")]
+    redis[("Redis 7<br/>labcrew-ops queue<br/>+ worker heartbeat")]
+  end
+
+  smtp["SMTP"]
+  search["Semantic Scholar / arXiv"]
+  llm["LLM API optional"]
+
+  director -->|"Auth.js cookie session"| web
+  student -->|"Auth.js cookie session"| web
+  mobile -->|"Bearer lc_... ApiAccessToken"| web
+  web --> postgres
+  web --> redis
+  web --> smtp
+  web --> search
+  web -.-> llm
+  worker --> redis
+  worker --> postgres
+  worker -.-> llm

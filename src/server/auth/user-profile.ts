@@ -2,21 +2,24 @@ import { MemberRole } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import type { AppRole } from "@/auth.config";
 
+/** Newest membership wins — invite join after a solo lab must become active. */
+const primaryMembershipInclude = {
+  members: {
+    include: {
+      program: { include: { organization: true } },
+    },
+    orderBy: { createdAt: "desc" as const },
+    take: 1,
+  },
+};
+
 export async function loadAuthProfile(email: string) {
   const prisma = getPrisma();
   const normalized = email.trim().toLowerCase();
-  let user = await prisma.user.findUnique({
+  return prisma.user.findUnique({
     where: { email: normalized },
-    include: {
-      members: {
-        include: { program: true },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-    },
+    include: primaryMembershipInclude,
   });
-
-  return user;
 }
 
 export async function ensureGoogleUser(input: {
@@ -27,13 +30,7 @@ export async function ensureGoogleUser(input: {
   const email = input.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({
     where: { email },
-    include: {
-      members: {
-        include: { program: true },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-    },
+    include: primaryMembershipInclude,
   });
 
   if (existing) {
@@ -41,13 +38,7 @@ export async function ensureGoogleUser(input: {
       return prisma.user.update({
         where: { id: existing.id },
         data: { name: input.name },
-        include: {
-          members: {
-            include: { program: true },
-            orderBy: { createdAt: "asc" },
-            take: 1,
-          },
-        },
+        include: primaryMembershipInclude,
       });
     }
     return existing;
@@ -58,13 +49,7 @@ export async function ensureGoogleUser(input: {
       email,
       name: input.name?.trim() || email.split("@")[0] || "User",
     },
-    include: {
-      members: {
-        include: { program: true },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-      },
-    },
+    include: primaryMembershipInclude,
   });
 }
 
@@ -75,7 +60,10 @@ export function profileFromUser(user: {
   members: Array<{
     id: string;
     role: MemberRole;
-    program: { name: string };
+    program: {
+      name: string;
+      organization?: { name: string };
+    };
   }>;
 }) {
   const membership = user.members[0];
@@ -99,6 +87,7 @@ export function profileFromUser(user: {
     role,
     memberId: membership.id,
     programName: membership.program.name,
+    organizationName: membership.program.organization?.name,
     needsOnboarding: false as const,
   };
 }

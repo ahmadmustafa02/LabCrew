@@ -1,0 +1,21 @@
+flowchart TB
+  subgraph People
+    director["Director<br/>Runs weekly ops, Approvals, assignments"]
+    student["Student<br/>Submits work; sees pace + approved reading/nudges"]
+  end
+
+  labcrew["LabCrew<br/>Research-lab OS: tenancy, Mission Control,<br/>Approvals, structured data, Adaptive Coach"]
+
+  subgraph Externals
+    smtp["SMTP<br/>Approved nudge delivery<br/>(console fallback)"]
+    s2["Semantic Scholar<br/>Primary paper search"]
+    arxiv["arXiv API<br/>Fallback paper search"]
+    llm["LLM API optional<br/>Groq/OpenAI-compatible<br/>Referee + Coach when LLM_API_KEY set"]
+  end
+
+  director -->|cookie / bearer| labcrew
+  student -->|cookie / bearer| labcrew
+  labcrew -->|deliverNudge on approve| smtp
+  labcrew -->|search on assignment create/edit| s2
+  labcrew -->|fallback search| arxiv
+  labcrew -->|optional score/draft| llm

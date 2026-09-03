@@ -51,7 +51,11 @@ export async function GET() {
       : 0;
 
     const pendingApprovals = await prisma.approvalItem.findMany({
-      where: { programId: program.id, status: ApprovalStatus.PENDING },
+      where: {
+        programId: program.id,
+        status: ApprovalStatus.PENDING,
+        kind: "nudge",
+      },
       orderBy: { createdAt: "asc" },
       take: 5,
       select: {
@@ -59,6 +63,7 @@ export async function GET() {
         title: true,
         body: true,
         targetName: true,
+        kind: true,
       },
     });
 

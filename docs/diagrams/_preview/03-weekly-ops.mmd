@@ -1,0 +1,36 @@
+sequenceDiagram
+  autonumber
+  actor Director
+  participant Web as web Next.js
+  participant Redis as Redis BullMQ
+  participant Worker as worker
+  participant PG as Postgres
+
+  Director->>Web: POST /api/ops/runs requireLabDirector
+  Web->>Web: probeOpsHealth
+
+  alt Redis down - degraded
+    Web-->>Director: 503 degraded - enqueue blocked
+  else Redis up, worker heartbeat stale/missing - delayed
+    Web->>PG: create AgentRun QUEUED
+    Web->>Redis: enqueue weekly-ops job
+    Web-->>Director: 200 delayed - job waiting for worker
+    Note over Redis,Worker: Job sits until worker recovers / heartbeat fresh
+    Worker->>Redis: claim job when back online
+  else Redis up, worker heartbeat fresh - ok
+    Web->>PG: create AgentRun QUEUED
+    Web->>Redis: enqueue weekly-ops job
+    Web-->>Director: 200 ok
+    Worker->>Redis: claim job
+  end
+
+  opt job claimed by worker
+    Worker->>PG: AgentRun RUNNING
+    Worker->>PG: AgentStep DISPATCHER
+    Worker->>PG: AgentStep PULSE signals + EngagementScore upsert
+    Worker->>PG: AgentStep REFEREE score submissions to exceptions
+    Worker->>PG: AgentStep COACH draft ApprovalItem nudges PENDING
+    Worker->>PG: AgentStep CLERK briefing + data-summary line
+    Worker->>PG: AgentRun SUCCEEDED + summary JSON
+    Note over Director,PG: Director later approves nudges in Approvals, deliverNudge to SMTP or console
+  end
