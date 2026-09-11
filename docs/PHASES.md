@@ -31,14 +31,32 @@
 
 - Index: [SYSTEM.md](./SYSTEM.md) — originally draft tables/index; Brief-privacy hotfix callout kept honest.
 
-### Phase 4 ∥ 5 — Flutter offline companion + Adaptive Coach
+### Phase 4 — Flutter offline companion (done — Field kit v1)
 
 - Conflict policy: server baseline; never silent discard of offline draft; user chooses keep mine / view theirs
-- Flutter in monorepo `apps/mobile`
+- Flutter in monorepo `apps/mobile` (Home / Collect / Insights / You)
+- Bearer issue: `POST /api/auth/mobile/login` and `POST /api/auth/tokens`
+
+### Phase 5 — Adaptive Coach
 - **Adaptive Coach Phase A (engagement score):** lab-scoped per-student per-week heuristic; director Analytics only. ADR: [adr/002-adaptive-coach.md](./adr/002-adaptive-coach.md). Verify: `npm run verify:phase-5a`
 - **Phase B (nudge personalization):** Coach reads score trend → warmer/earlier vs reinforce drafts in Approvals. Verify: `npm run verify:phase-5b`
 - **Phase C (resources):** Semantic Scholar → arXiv retrieval; LLM selects only from hits; Approvals gate; `Milestone.coachResources` on approve. Verify: `npm run verify:phase-5c`
 - **Phase D (persuasive UI):** Student home pace + approved nudge; assignment suggested reading. Verify: `npm run verify:phase-5d`
+- **Next step (not a coding ITS):** deterministic pick — empty collect, then writeup, then held catalog fields. Web Home + Field Home. Tests: `npx tsx --test tests/data/recommend.test.ts`
+
+### Research plan (director) — topic → draft → add
+
+- Manual assignment create stays. **Plan from a topic** drafts collect / catalog / writeup / review weeks.
+- Heuristic without `LLM_API_KEY`; model draft if set. Citations and URLs are stripped.
+- Commit writes real milestones. Student **Do this next** then follows that roster.
+- Similar papers (Semantic Scholar → arXiv) and datasets (Hugging Face) on **Plan → Find sources**. Attach as materials. Dataset Catalog rows hold unsourced fields. No invented titles.
+- Tests: `npx tsx --test tests/research/roadmap.test.ts`
+
+### Catalog — paper → checked record (done)
+
+- D4ED-shaped fields; quote must appear in the source; unsupported values are held
+- Web: `/app/catalog` search + compare; human approve/reject on held fields
+- Not a chatbot. Verifier is deterministic.
 
 ### Phase 6 finalize (done)
 

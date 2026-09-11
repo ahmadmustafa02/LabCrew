@@ -22,6 +22,11 @@ enum MilestoneStatus {
   CLOSED
 }
 
+enum MilestoneAudience {
+  ALL
+  SELECTED
+}
+
 enum SubmissionStatus {
   DRAFT
   SUBMITTED
@@ -77,6 +82,7 @@ model Organization {
   programs               Program[]
   members                Member[]
   milestones             Milestone[]
+  milestoneAssignees     MilestoneAssignee[]
   submissions            Submission[]
   submissionDataPoints   SubmissionDataPoint[]
   agentRuns              AgentRun[]
@@ -97,6 +103,9 @@ model Organization {
   submissionComments     SubmissionComment[]
   submissionReactions    SubmissionReaction[]
   submissionPosts        SubmissionPost[]
+  catalogRecords         CatalogRecord[]
+  catalogFields          CatalogField[]
+  researchPlans          ResearchPlan[]
 }
 
 model Program {
@@ -120,6 +129,8 @@ model Program {
   opsSchedule    ProgramOpsSchedule?
   apiAccessTokens ApiAccessToken[]
   engagementScores EngagementScore[]
+  catalogRecords   CatalogRecord[]
+  researchPlans    ResearchPlan[]
 
   @@index([organizationId])
 }
@@ -197,6 +208,7 @@ model Member {
   engagementScores EngagementScore[]
   submissionComments  SubmissionComment[]
   submissionReactions SubmissionReaction[]
+  assignmentSeats     MilestoneAssignee[]
 
   @@unique([programId, userId])
   @@index([organizationId])
@@ -224,13 +236,52 @@ model Milestone {
   coachResources Json?
   dueAt          DateTime?
   status         MilestoneStatus @default(UPCOMING)
+  audience       MilestoneAudience @default(ALL)
+  researchPlanId String?
+  researchPlan   ResearchPlan?   @relation(fields: [researchPlanId], references: [id], onDelete: SetNull)
   sortOrder      Int             @default(0)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   submissions    Submission[]
+  assignees      MilestoneAssignee[]
 
   @@index([organizationId])
   @@index([programId])
+  @@index([researchPlanId])
+}
+
+/// Director roadmap that created a set of assignments.
+model ResearchPlan {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  topic          String
+  weeks          Int          @default(6)
+  source         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  milestones     Milestone[]
+
+  @@index([organizationId])
+  @@index([programId])
+}
+
+/// Empty when audience is ALL. When SELECTED, only these students see the task.
+model MilestoneAssignee {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  milestoneId    String
+  milestone      Milestone    @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([milestoneId, memberId])
+  @@index([organizationId])
+  @@index([memberId])
 }
 
 model Submission {
@@ -662,4 +713,57 @@ model ProgramOpsSchedule {
   updatedAt      DateTime     @updatedAt
 
   @@index([organizationId])
+}
+
+enum CatalogRecordStatus {
+  draft
+  pending_review
+  finalized
+}
+
+enum CatalogFieldTrust {
+  trusted
+  held
+  rejected
+}
+
+/// Paper → checked dataset row (D4ED-shaped, lab-scoped).
+model CatalogRecord {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  schemaId       String              @default("d4ed")
+  title          String
+  sourceName     String?
+  sourceText     String              @db.Text
+  status         CatalogRecordStatus @default(draft)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  fields         CatalogField[]
+
+  @@index([organizationId, programId])
+  @@index([status])
+}
+
+model CatalogField {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recordId       String
+  record         CatalogRecord     @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  key            String
+  label          String
+  value          String
+  quote          String
+  page           Int?
+  confidence     String
+  trust          CatalogFieldTrust @default(held)
+  verifierNote   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([organizationId])
+  @@index([recordId, key])
 }

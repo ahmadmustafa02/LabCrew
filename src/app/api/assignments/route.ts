@@ -6,6 +6,11 @@ import type {
   AssignmentRubric,
   MaterialItem,
 } from "@/lib/assignment-types";
+import {
+  replaceAssignees,
+  resolveStudentTargets,
+  studentMilestoneWhere,
+} from "@/server/assignments/audience";
 import { requireDirector } from "@/server/auth/api-session";
 import { parseDataSchema } from "@/server/data/submission-data";
 import { inLab, requireLabScope } from "@/server/tenancy/lab-scope";
@@ -21,7 +26,11 @@ export async function GET(request: Request) {
     const prisma = getPrisma();
 
     const assignments = await prisma.milestone.findMany({
-      where: { programId: membership.programId, ...inLab(labId) },
+      where: {
+        programId: membership.programId,
+        ...inLab(labId),
+        ...(appRole === "student" ? studentMilestoneWhere(membership.id) : {}),
+      },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
         submissions: {
@@ -31,6 +40,9 @@ export async function GET(request: Request) {
             reviewStatus: true,
             memberId: true,
           },
+        },
+        assignees: {
+          include: { member: { include: { user: { select: { name: true } } } } },
         },
         program: {
           include: {
@@ -54,6 +66,12 @@ export async function GET(request: Request) {
           ["SUBMITTED", "SCORED"].includes(s.status),
         );
         const mySub = a.submissions.find((s) => s.memberId === myId);
+        const studentCount =
+          a.audience === "SELECTED" ? a.assignees.length : a.program.members.length;
+        const assignedLabel =
+          a.audience === "SELECTED"
+            ? a.assignees.map((x) => x.member.user.name).join(", ")
+            : "Everyone";
         return {
           id: a.id,
           title: a.title,
@@ -61,11 +79,14 @@ export async function GET(request: Request) {
           instructions: a.instructions,
           materials: a.materials,
           rubric: a.rubric,
+          dataSchema: parseDataSchema(a.dataSchema),
           dueAt: a.dueAt,
           status: a.status,
+          audience: a.audience,
+          assignedLabel,
           sortOrder: a.sortOrder,
           materialCount: Array.isArray(a.materials) ? a.materials.length : 0,
-          studentCount: a.program.members.length,
+          studentCount,
           submissionCount: turnedIn.length,
           pendingReview: turnedIn.filter(
             (s) => s.reviewStatus === "PENDING_REVIEW",
@@ -108,6 +129,8 @@ export async function POST(request: Request) {
       rubric?: AssignmentRubric;
       dataSchema?: AssignmentDataSchema | null;
       sortOrder?: number;
+      audience?: "ALL" | "SELECTED";
+      memberIds?: string[];
     };
 
     if (!body.title?.trim()) {
@@ -116,6 +139,15 @@ export async function POST(request: Request) {
 
     const programId = gate.session.membership.programId;
     const organizationId = gate.session.membership.organizationId;
+    const targets = await resolveStudentTargets({
+      labId: organizationId,
+      programId,
+      audience: body.audience,
+      memberIds: body.memberIds,
+    });
+    if (!targets.ok) {
+      return NextResponse.json({ ok: false, error: targets.error }, { status: targets.status });
+    }
     const prisma = getPrisma();
 
     const maxSort = await prisma.milestone.aggregate({
@@ -133,6 +165,7 @@ export async function POST(request: Request) {
         description: body.description?.trim() || null,
         instructions: body.instructions?.trim() || null,
         dueAt: body.dueAt ? new Date(body.dueAt) : null,
+        audience: targets.audience,
         status: body.status ?? MilestoneStatus.ACTIVE,
         sortOrder: body.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 1,
         materials: (body.materials ?? []) as Prisma.InputJsonValue,
@@ -147,6 +180,13 @@ export async function POST(request: Request) {
           acceptData: false,
         }) as Prisma.InputJsonValue,
       },
+    });
+
+    await replaceAssignees({
+      labId: organizationId,
+      milestoneId: assignment.id,
+      audience: targets.audience,
+      memberIds: targets.memberIds,
     });
 
     return NextResponse.json({ ok: true, assignment });

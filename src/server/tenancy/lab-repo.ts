@@ -27,6 +27,9 @@ export async function findMilestoneDetailInLab(
         },
         orderBy: { updatedAt: "desc" },
       },
+      assignees: {
+        include: { member: { include: { user: { select: { name: true, email: true } } } } },
+      },
       program: {
         include: {
           members: {

@@ -3,7 +3,7 @@
  * Set in .env:
  *   LLM_API_KEY=...          (required to enable)
  *   LLM_BASE_URL=https://api.groq.com/openai/v1   (default Groq)
- *   LLM_MODEL=llama-3.1-8b-instant                 (default)
+ *   LLM_MODEL=openai/gpt-oss-20b                   (default; Groq retired llama-3.1-8b-instant)
  *
  * Without a key, agents keep using heuristics.
  */
@@ -31,7 +31,7 @@ export async function chatJson<T>(input: {
     process.env.LLM_BASE_URL?.trim() || "https://api.groq.com/openai/v1"
   ).replace(/\/$/, "");
   const model =
-    process.env.LLM_MODEL?.trim() || "llama-3.1-8b-instant";
+    process.env.LLM_MODEL?.trim() || "openai/gpt-oss-20b";
 
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -45,7 +45,12 @@ export async function chatJson<T>(input: {
         temperature: input.temperature ?? 0.2,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: input.system },
+          {
+            role: "system",
+            content: /json/i.test(input.system)
+              ? input.system
+              : `${input.system}\nReply with a JSON object.`,
+          },
           { role: "user", content: input.user },
         ] as LlmChatMessage[],
       }),
@@ -91,7 +96,7 @@ export async function chatText(input: {
     process.env.LLM_BASE_URL?.trim() || "https://api.groq.com/openai/v1"
   ).replace(/\/$/, "");
   const model =
-    process.env.LLM_MODEL?.trim() || "llama-3.1-8b-instant";
+    process.env.LLM_MODEL?.trim() || "openai/gpt-oss-20b";
 
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {

@@ -54,12 +54,13 @@ Research cohorts drown in Slack threads, missing demos, and silent students. Lab
 - **Monday Brief** — compiled briefing, standup agenda, cohort data summary, Markdown / print export  
 - **Mission Control** — dispatch Pulse → Referee → Coach → Clerk  
 - **Assignments** — materials, rubrics, structured data schemas, open/close/reopen, Teams-style list + detail  
+- **Plan** — director types a research topic; LabCrew drafts milestones; nothing is assigned until they add it. **Find sources** on a plan: similar papers (S2/arXiv) and hub datasets (Hugging Face). Attach as materials; Catalog fields stay held without a quote.  
 - **Approvals** — edit / approve / reject **nudge** drafts (email + in-app note when approved; SMTP when configured)  
 - **Meetings · Messages · Announcements · Analytics · Team** (invites, roles, revoke)
 
 ### Student
 
-- **Home** — upcoming meetings, tasks, unseen inbox, notes from Coach  
+- **Home** — upcoming meetings, tasks, unseen inbox, notes from Coach, and a **Do this next** card (collect → writeup → catalog hold)  
 - **Assignments** — turn in evidence; each attempt is a **work-log post** (edit a post, or turn in again after feedback)  
 - **Meetings · Messages · Announcements**
 
@@ -70,6 +71,14 @@ Students and directors share a per-submission **work feed**: posts for each turn
 ### Structured cohort data (optional)
 
 Assignments can collect CSV / form rows as lab-scoped data cells (validate → flag outliers → summarize on the Brief with privacy floors). Details: [docs/DATA.md](./docs/DATA.md).
+
+### Catalog (paper → checked record)
+
+Paste a paper excerpt or upload a PDF. LabCrew fills dataset fields only when a cited sentence is **in the paper and supports the value**. The rest stay held for a human. Search and compare trusted rows at `/app/catalog`.
+
+### Field kit (Flutter)
+
+Companion app in [`apps/mobile`](./apps/mobile) — sign in, collect rows offline, chart your series. Not a chat clone of the website. Run notes in that folder.
 
 ### Marketing site
 
@@ -82,6 +91,7 @@ Polished SaaS pages with light/dark mode: `/` · `/product` · `/how-it-works` �
 | Layer | Choice |
 | ----- | ------ |
 | App | Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 |
+| Mobile | Flutter companion (`apps/mobile`) · bearer tokens |
 | Data | PostgreSQL · Prisma 7 · files stored in Postgres (no S3 required) |
 | Jobs | Redis · BullMQ worker (`npm run worker`) |
 | Auth | Auth.js — credentials, invites, optional Google OAuth · active lab via membership |
@@ -143,7 +153,7 @@ AUTH_URL="http://localhost:3000"
 | `SMTP_*` / `EMAIL_FROM` | Optional real email for nudges & resets |
 | `LLM_API_KEY` | Optional — enables LLM Referee / Coach |
 | `LLM_BASE_URL` | Default `https://api.groq.com/openai/v1` |
-| `LLM_MODEL` | Default `llama-3.1-8b-instant` |
+| `LLM_MODEL` | Default `openai/gpt-oss-20b` (Groq retired `llama-3.1-8b-instant`) |
 
 Without `LLM_API_KEY`, scoring and nudge copy use heuristics. Without SMTP, reset links and nudge delivery land in the **server console**.
 

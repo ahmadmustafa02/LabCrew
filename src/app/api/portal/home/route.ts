@@ -1,10 +1,12 @@
 import { MemberRole, MilestoneStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
+import { loadNextStep } from "@/server/coach/recommend";
 import {
   loadApprovedNudgeForStudent,
   loadStudentProgress,
 } from "@/server/coach/student-coach";
+import { studentMilestoneWhere } from "@/server/assignments/audience";
 import { inLab, requireLabStudent } from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
@@ -21,7 +23,7 @@ export async function GET(request: Request) {
     const lab = inLab(labId);
     const now = new Date();
 
-    const [meetings, milestones, notifications, unreadCount, progress, nudge] =
+    const [meetings, milestones, notifications, unreadCount, progress, nudge, nextStep] =
       await Promise.all([
         prisma.meeting.findMany({
           where: {
@@ -41,6 +43,7 @@ export async function GET(request: Request) {
             programId,
             ...lab,
             status: { in: [MilestoneStatus.ACTIVE, MilestoneStatus.UPCOMING] },
+            ...studentMilestoneWhere(memberId),
           },
           include: {
             submissions: {
@@ -76,6 +79,7 @@ export async function GET(request: Request) {
           email: gate.ctx.email,
           name: gate.ctx.name,
         }),
+        loadNextStep({ labId, programId, memberId }),
       ]);
 
     const inbox: typeof notifications = [];
@@ -151,6 +155,7 @@ export async function GET(request: Request) {
               }
             : null,
         },
+        nextStep,
       },
     });
   } catch (error) {
