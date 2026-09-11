@@ -67,3 +67,7 @@ Tone: calm, specific, respectful of research time. Prefer verbs like *open*, *no
 **Do this next** on student Home / Field is a rule, not a model: unfinished field log first, then the writeup, then catalog fields waiting on a source check. It does not rank coding problems or invent difficulty.
 
 **Plan from a topic** is a director draft. The roster is empty until they add assignments. The draft does not name papers or datasets it was not given.
+
+**Who has what** is starter homework plus a sign-out list. It is not a purchase or calibration system.
+
+Dual-role click-through notes (not an independent user study): [PHASE7-WALKTHROUGH.md](./PHASE7-WALKTHROUGH.md).

@@ -950,7 +950,7 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
             <div>
               <p className="text-xs font-medium text-lc-muted">Attachments</p>
               <p className="mt-0.5 text-sm text-lc-muted">
-                Upload attack docs, PDFs, notebooks, slides, or add external links.
+                Upload PDFs, notebooks, slides, or add external links.
               </p>
             </div>
 

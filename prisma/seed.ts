@@ -36,6 +36,7 @@ async function main() {
 
   await prisma.catalogField.deleteMany();
   await prisma.catalogRecord.deleteMany();
+  await prisma.researchPlan.deleteMany();
   await prisma.approvalItem.deleteMany();
   await prisma.engagementScore.deleteMany();
   await prisma.storedFile.deleteMany();
@@ -46,6 +47,7 @@ async function main() {
   await prisma.agentRun.deleteMany();
   await prisma.submissionDataPoint.deleteMany();
   await prisma.submission.deleteMany();
+  await prisma.equipment.deleteMany();
   await prisma.milestone.deleteMany();
   await prisma.member.deleteMany();
   await prisma.program.deleteMany();
@@ -81,6 +83,38 @@ async function main() {
       programId: program.id,
       userId: director.id,
       role: MemberRole.MENTOR,
+    },
+  });
+
+  const basit = await prisma.user.create({
+    data: {
+      email: "basit.raza@faculty.comsats.lab",
+      name: "Dr Basit Raza",
+      passwordHash,
+    },
+  });
+  await prisma.member.create({
+    data: {
+      organizationId: org.id,
+      programId: program.id,
+      userId: basit.id,
+      role: MemberRole.MENTOR,
+    },
+  });
+
+  const ahmad = await prisma.user.create({
+    data: {
+      email: "ahmad.mustafa@students.comsats.lab",
+      name: "Ahmad Mustafa",
+      passwordHash,
+    },
+  });
+  await prisma.member.create({
+    data: {
+      organizationId: org.id,
+      programId: program.id,
+      userId: ahmad.id,
+      role: MemberRole.STUDENT,
     },
   });
 
@@ -149,6 +183,25 @@ async function main() {
       sortOrder: 1,
       dueAt: new Date("2026-09-18T23:59:00.000Z"),
     },
+  });
+
+  await prisma.equipment.createMany({
+    data: [
+      {
+        organizationId: org.id,
+        programId: program.id,
+        name: "pH meter #2",
+        note: "Bench drawer A",
+        status: "IN_LAB",
+      },
+      {
+        organizationId: org.id,
+        programId: program.id,
+        name: "Turbidity tube",
+        note: "Field kit",
+        status: "IN_LAB",
+      },
+    ],
   });
 
   for (const [index, name] of STUDENTS.entries()) {
@@ -280,6 +333,8 @@ The dataset is released under a CC-BY-4.0 licence for research reuse.`;
   console.log(`Program: ${program.name}`);
   console.log(`Students: ${STUDENTS.length}`);
   console.log(`Login: director@northwater.lab / ${DEMO_PASSWORD}`);
+  console.log(`Walkthrough director: basit.raza@faculty.comsats.lab / ${DEMO_PASSWORD}`);
+  console.log(`Walkthrough student: ahmad.mustafa@students.comsats.lab / ${DEMO_PASSWORD}`);
   console.log(
     `Student: ayesha.rahman@students.northwater.lab / ${DEMO_PASSWORD}`,
   );

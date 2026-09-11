@@ -12,6 +12,7 @@ describe("pickNextStep", () => {
           title: "Week 4 writeup",
           dueAt: new Date("2026-08-20"),
           collect: false,
+          onboard: false,
           submitted: false,
           draft: false,
           rowCount: 0,
@@ -21,6 +22,7 @@ describe("pickNextStep", () => {
           title: "Stream temperature log",
           dueAt: new Date("2026-09-18"),
           collect: true,
+          onboard: false,
           submitted: false,
           draft: false,
           rowCount: 0,
@@ -40,6 +42,7 @@ describe("pickNextStep", () => {
           title: "Stream temperature log",
           dueAt: null,
           collect: true,
+          onboard: false,
           submitted: true,
           draft: false,
           rowCount: 4,
@@ -49,6 +52,7 @@ describe("pickNextStep", () => {
           title: "Week 4 writeup",
           dueAt: null,
           collect: false,
+          onboard: false,
           submitted: false,
           draft: false,
           rowCount: 0,
@@ -68,6 +72,7 @@ describe("pickNextStep", () => {
           title: "Stream temperature log",
           dueAt: null,
           collect: true,
+          onboard: false,
           submitted: true,
           draft: false,
           rowCount: 4,
@@ -76,5 +81,35 @@ describe("pickNextStep", () => {
     });
     assert.equal(next.kind, "catalog");
     assert.equal(next.href, "/app/catalog");
+  });
+
+  it("prefers week 0 onboard over a later collect", () => {
+    const next = pickNextStep({
+      heldCatalog: 0,
+      tasks: [
+        {
+          id: "c",
+          title: "Stream temperature log",
+          dueAt: null,
+          collect: true,
+          onboard: false,
+          submitted: false,
+          draft: false,
+          rowCount: 0,
+        },
+        {
+          id: "z",
+          title: "Week 0 — Account works",
+          dueAt: null,
+          collect: false,
+          onboard: true,
+          submitted: false,
+          draft: false,
+          rowCount: 0,
+        },
+      ],
+    });
+    assert.equal(next.assignmentId, "z");
+    assert.match(next.reason, /Week 0/i);
   });
 });

@@ -55,12 +55,13 @@ Research cohorts drown in Slack threads, missing demos, and silent students. Lab
 - **Mission Control** — dispatch Pulse → Referee → Coach → Clerk  
 - **Assignments** — materials, rubrics, structured data schemas, open/close/reopen, Teams-style list + detail  
 - **Plan** — director types a research topic; LabCrew drafts milestones; nothing is assigned until they add it. **Find sources** on a plan: similar papers (S2/arXiv) and hub datasets (Hugging Face). Attach as materials; Catalog fields stay held without a quote.  
+- **Who has what** — starter homework for a new student, plus who took which lab thing and when it is due back.  
 - **Approvals** — edit / approve / reject **nudge** drafts (email + in-app note when approved; SMTP when configured)  
 - **Meetings · Messages · Announcements · Analytics · Team** (invites, roles, revoke)
 
 ### Student
 
-- **Home** — upcoming meetings, tasks, unseen inbox, notes from Coach, and a **Do this next** card (collect → writeup → catalog hold)  
+- **Home** — upcoming meetings, tasks, unseen inbox, notes from Coach, and a **Do this next** card (Week 0 first, then collect, writeup, overdue sign-out, catalog hold)  
 - **Assignments** — turn in evidence; each attempt is a **work-log post** (edit a post, or turn in again after feedback)  
 - **Meetings · Messages · Announcements**
 
@@ -173,6 +174,8 @@ Full free-host notes: [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) · Administra
 8. If you join another lab, use the **lab switcher** in the shell — lists and reviews stay scoped to the active lab  
 
 Seeded demo password (if you ran `npm run db:seed`): `labcrew`
+
+Walkthrough accounts (same password): `basit.raza@faculty.comsats.lab` (director), `ahmad.mustafa@students.comsats.lab` (student). Notes: [docs/PHASE7-WALKTHROUGH.md](./docs/PHASE7-WALKTHROUGH.md) — dual-role builder walkthrough, not a measured user study.
 
 ---
 

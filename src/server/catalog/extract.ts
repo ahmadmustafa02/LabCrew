@@ -6,8 +6,23 @@ type LlmField = {
   key?: string;
   value?: string;
   quote?: string;
-  page?: number;
+  page?: number | string | null;
 };
+
+export function asCatalogPage(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return Math.trunc(n);
+  }
+  return null;
+}
+
+function asCatalogText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
 
 const sentenceAround = (source: string, match: RegExp): { value: string; quote: string } | null => {
   const found = source.match(match);
@@ -137,9 +152,9 @@ export async function extractCatalogFields(source: string): Promise<{
     return {
       key: spec.key,
       label: spec.label,
-      value: (fromLlm?.value ?? fromH?.value ?? "").trim(),
-      quote: (fromLlm?.quote ?? fromH?.quote ?? "").trim(),
-      page: fromLlm?.page ?? null,
+      value: asCatalogText(fromLlm?.value) || asCatalogText(fromH?.value),
+      quote: asCatalogText(fromLlm?.quote) || asCatalogText(fromH?.quote),
+      page: asCatalogPage(fromLlm?.page),
     };
   });
 

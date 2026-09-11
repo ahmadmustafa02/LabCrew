@@ -2,9 +2,10 @@ import { MilestoneStatus, SubmissionStatus } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
 import { parseDataSchema } from "@/server/data/submission-data";
 import { studentMilestoneWhere } from "@/server/assignments/audience";
+import { milestoneIsOnboard } from "@/server/desk/onboard";
 import { inLab } from "@/server/tenancy/lab-scope";
 
-export type NextStepKind = "collect" | "writeup" | "catalog" | "clear";
+export type NextStepKind = "collect" | "writeup" | "catalog" | "gear" | "clear";
 
 export type NextStep = {
   kind: NextStepKind;
@@ -19,6 +20,7 @@ type Candidate = {
   title: string;
   dueAt: Date | null;
   collect: boolean;
+  onboard: boolean;
   submitted: boolean;
   draft: boolean;
   rowCount: number;
@@ -27,7 +29,21 @@ type Candidate = {
 export function pickNextStep(input: {
   tasks: Candidate[];
   heldCatalog: number;
+  overdueGear?: { name: string } | null;
 }): NextStep {
+  const openOnboard = input.tasks
+    .filter((t) => t.onboard && !t.submitted)
+    .sort((a, b) => (a.dueAt?.getTime() ?? 9e15) - (b.dueAt?.getTime() ?? 9e15))[0];
+  if (openOnboard) {
+    return {
+      kind: openOnboard.collect ? "collect" : "writeup",
+      title: openOnboard.title,
+      reason: "Week 0 first — accounts, safety, or a practice collect. Then the term work.",
+      href: `/app/assignments/${openOnboard.id}`,
+      assignmentId: openOnboard.id,
+    };
+  }
+
   const openCollect = input.tasks
     .filter((t) => t.collect && !t.submitted)
     .sort((a, b) => (a.dueAt?.getTime() ?? 9e15) - (b.dueAt?.getTime() ?? 9e15));
@@ -67,6 +83,15 @@ export function pickNextStep(input: {
       reason: "Field logs are in. Next is the short report — same week, different skill.",
       href: `/app/assignments/${writeup.id}`,
       assignmentId: writeup.id,
+    };
+  }
+
+  if (input.overdueGear) {
+    return {
+      kind: "gear",
+      title: input.overdueGear.name,
+      reason: "This is past the return date. Put it back on Who has what.",
+      href: "/app/desk",
     };
   }
 
@@ -118,9 +143,21 @@ export async function loadNextStep(input: {
     },
   });
 
-  const heldCatalog = await prisma.catalogField.count({
-    where: { organizationId: input.labId, trust: "held" },
-  });
+  const [heldCatalog, overdue] = await Promise.all([
+    prisma.catalogField.count({
+      where: { organizationId: input.labId, trust: "held" },
+    }),
+    prisma.equipment.findFirst({
+      where: {
+        organizationId: input.labId,
+        programId: input.programId,
+        holderMemberId: input.memberId,
+        status: "CHECKED_OUT",
+        dueBackAt: { lt: new Date() },
+      },
+      select: { name: true },
+    }),
+  ]);
 
   const tasks: Candidate[] = milestones.map((ms) => {
     const sub = ms.submissions[0];
@@ -133,11 +170,16 @@ export async function loadNextStep(input: {
       title: ms.title,
       dueAt: ms.dueAt,
       collect: isCollect(ms),
+      onboard: milestoneIsOnboard(ms.rubric),
       submitted,
       draft: sub?.status === SubmissionStatus.DRAFT,
       rowCount: sub?._count.dataPoints ?? 0,
     };
   });
 
-  return pickNextStep({ tasks, heldCatalog });
+  return pickNextStep({
+    tasks,
+    heldCatalog,
+    overdueGear: overdue,
+  });
 }

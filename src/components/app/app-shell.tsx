@@ -62,6 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           { href: "/app/assignments", label: "Assignments" },
           { href: "/app/research", label: "Plan" },
           { href: "/app/catalog", label: "Catalog" },
+          { href: "/app/desk", label: "Who has what" },
           { href: "/app/meetings", label: "Meetings", badgeKey: "meetings" },
           {
             href: "/app/announcements",
@@ -77,6 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           { href: "/app/home", label: "Home" },
           { href: "/app/assignments", label: "Assignments" },
           { href: "/app/catalog", label: "Catalog" },
+          { href: "/app/desk", label: "Who has what" },
           { href: "/app/meetings", label: "Meetings", badgeKey: "meetings" },
           {
             href: "/app/announcements",

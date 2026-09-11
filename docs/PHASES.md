@@ -44,6 +44,12 @@
 - **Phase D (persuasive UI):** Student home pace + approved nudge; assignment suggested reading. Verify: `npm run verify:phase-5d`
 - **Next step (not a coding ITS):** deterministic pick — empty collect, then writeup, then held catalog fields. Web Home + Field Home. Tests: `npx tsx --test tests/data/recommend.test.ts`
 
+### Who has what — starter homework + gear list (ResOps)
+
+- Director adds three Week 0 assignments (account, safety, practice collect). Next step prefers them.
+- Sign-out list: on the shelf / someone took it / broken. Not a purchase or repair shop.
+- Web: `/app/desk`
+
 ### Research plan (director) — topic → draft → add
 
 - Manual assignment create stays. **Plan from a topic** drafts collect / catalog / writeup / review weeks.
@@ -63,4 +69,7 @@
 - Mermaid in [SYSTEM.md](./SYSTEM.md): C4 context, C4 container, weekly-ops sequence, structured-data privacy sequence.
 - Status line on SYSTEM.md set to **Finalized**; Brief-privacy hotfix callout retained.
 
-### Phase 7 — Usability study (human track, parallel)
+### Phase 7 — Dual-role walkthrough (notes only)
+
+- **Not** an independent user study. Builder operated both accounts. Notes: [PHASE7-WALKTHROUGH.md](./PHASE7-WALKTHROUGH.md)
+- Do **not** claim measured time-to-competence from this file.

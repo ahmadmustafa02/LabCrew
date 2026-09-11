@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
-import { extractCatalogFields } from "@/server/catalog/extract";
+import { asCatalogPage, extractCatalogFields } from "@/server/catalog/extract";
 import { looksLikePdf, textFromPdf } from "@/server/catalog/pdf-text";
 import { inLab, requireLabScope } from "@/server/tenancy/lab-scope";
 import { findStoredFileInLab } from "@/server/tenancy/lab-repo";
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
             label: f.label,
             value: f.value,
             quote: f.quote,
-            page: f.page ?? null,
+            page: asCatalogPage(f.page),
             confidence: f.confidence,
             trust: f.trust,
             verifierNote: f.verifierNote,

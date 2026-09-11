@@ -27,6 +27,12 @@ enum MilestoneAudience {
   SELECTED
 }
 
+enum EquipmentStatus {
+  IN_LAB
+  CHECKED_OUT
+  BROKEN
+}
+
 enum SubmissionStatus {
   DRAFT
   SUBMITTED
@@ -106,6 +112,7 @@ model Organization {
   catalogRecords         CatalogRecord[]
   catalogFields          CatalogField[]
   researchPlans          ResearchPlan[]
+  equipment              Equipment[]
 }
 
 model Program {
@@ -131,6 +138,7 @@ model Program {
   engagementScores EngagementScore[]
   catalogRecords   CatalogRecord[]
   researchPlans    ResearchPlan[]
+  equipment        Equipment[]
 
   @@index([organizationId])
 }
@@ -209,6 +217,7 @@ model Member {
   submissionComments  SubmissionComment[]
   submissionReactions SubmissionReaction[]
   assignmentSeats     MilestoneAssignee[]
+  heldEquipment       Equipment[]
 
   @@unique([programId, userId])
   @@index([organizationId])
@@ -282,6 +291,27 @@ model MilestoneAssignee {
   @@unique([milestoneId, memberId])
   @@index([organizationId])
   @@index([memberId])
+}
+
+/// Simple lab desk: who holds which instrument. Not a CMMS.
+model Equipment {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  programId      String
+  program        Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  name           String
+  note           String?
+  status         EquipmentStatus @default(IN_LAB)
+  holderMemberId String?
+  holder         Member?         @relation(fields: [holderMemberId], references: [id], onDelete: SetNull)
+  dueBackAt      DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@index([programId])
+  @@index([holderMemberId])
 }
 
 model Submission {
