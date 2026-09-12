@@ -1,5 +1,3 @@
-<img width="1624" height="950" alt="image" src="https://github.com/user-attachments/assets/6811a084-88fc-4fd9-931f-8ff4d7036e1e" /># LabCrew
-
 **Your lab’s AI operations crew.**  
 Humans direct. Agents collect signals, score evidence, draft nudges, and prepare the Monday briefing — nothing reaches students until you approve.
 
