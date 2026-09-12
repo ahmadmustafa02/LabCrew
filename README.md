@@ -23,10 +23,31 @@ LabCrew is the operating system for **research labs and internship cohorts** —
 | For directors | For students |
 | ------------- | ------------ |
 | Run weekly ops from Mission Control | Submit work with files, links, writeups, and optional structured data |
+| Plan a topic, find papers/datasets, attach only what students should see | **Do this next** — one recommended action, not a task dump |
 | Review submissions on a work-log thread (pending → revision → approved → done) | Track review status, professor comments, and resubmit as new posts |
+| Sign gear in and out; add Week 0 starter homework | Take / return lab things; turn in Week 0 on day one |
 | Approve or edit nudges before email | Join meetings, RSVP, read announcements |
 | Read / export the Monday Brief | Message directors in one thread |
 | Switch across labs when you belong to more than one | See only the active lab’s work |
+
+---
+
+## What you can demo today
+
+These are shipped product surfaces — not slides.
+
+| Capability | What a professor can click |
+| ---------- | -------------------------- |
+| **Next-step recommender** | Student Home **Do this next**. Order is fixed: Week 0 onboard → empty collect → started collect → writeup → overdue sign-out → held catalog field. Not a gamified coding tutor. |
+| **Find papers** | Plan → **Find papers**. Semantic Scholar, then arXiv, then OpenAlex. Titles and URLs come from those APIs. Empty is honest. Rate limits are retried; a 429 is not cached as “no papers.” |
+| **Find datasets** | Plan → **Find datasets**. Hugging Face hub search. Attach as material, or attach + Catalog hold (licence stays held until a quote exists). |
+| **Plan from a topic** | Director types a topic → LabCrew drafts weeks → nothing is assigned until they click add. No invented citations. |
+| **Catalog (paper → checked record)** | Paste or upload a paper. A field is trusted only when the cited sentence is **in the source and supports the value**. The rest stay **held**. Search and compare at `/app/catalog`. |
+| **Who has what + Week 0** | Starter homework (account, safety, practice collect) plus a sign-out list: on the shelf / someone took it / you have it / broken. |
+| **Field kit** | Flutter companion: sign in, collect rows offline, chart the series. Web + phone, not a chat clone. |
+| **Director + student walkthrough** | Named path (Dr Basit Raza, Ahmad Mustafa) with 10 friction notes: [docs/PHASE7-WALKTHROUGH.md](./docs/PHASE7-WALKTHROUGH.md). This file does **not** report a measured time-to-competence number. |
+
+Story URLs on the same host: `/demo` · `/demo/resops` · `/demo/dataforge` · `/demo/catalog` · `/demo/next-step` · `/demo/plan`
 
 ---
 
@@ -44,6 +65,8 @@ Research cohorts drown in Slack threads, missing demos, and silent students. Lab
 - **Human-in-the-loop** — nudges never auto-send
 - **Lab-scoped tenancy** — every query is tied to the active organization; multi-lab users switch memberships in the shell
 - **One workspace** — assignments, meetings, messages, announcements, analytics
+- **Retrieved sources, not invented ones** — Find papers / Find datasets call live APIs; Catalog refuses unsourced fields
+- **Next step, not a pile of overdue tasks** — Coach picks one action from the real roster
 
 ---
 
@@ -61,8 +84,10 @@ Research cohorts drown in Slack threads, missing demos, and silent students. Lab
 
 ### Student
 
-- **Home** — upcoming meetings, tasks, unseen inbox, notes from Coach, and a **Do this next** card (Week 0 first, then collect, writeup, overdue sign-out, catalog hold)  
+- **Home** — upcoming meetings, tasks, unseen inbox, notes from Coach, and a **Do this next** card (the next-step recommender: Week 0 first, then collect, writeup, overdue sign-out, catalog hold)  
+- **Who has what** — take or return lab things; see what is still on the shelf  
 - **Assignments** — turn in evidence; each attempt is a **work-log post** (edit a post, or turn in again after feedback)  
+- **Catalog** — read trusted rows the director extracted; held fields stay held  
 - **Meetings · Messages · Announcements**
 
 ### Collaboration on submissions
@@ -83,7 +108,7 @@ Companion app in [`apps/mobile`](./apps/mobile) — sign in, collect rows offlin
 
 ### Marketing site
 
-Polished SaaS pages with light/dark mode: `/` · `/product` · `/how-it-works` · `/pricing`
+Polished SaaS pages with light/dark mode: `/` · `/product` · `/how-it-works` · `/pricing` · `/demo`
 
 ---
 
@@ -152,6 +177,7 @@ AUTH_URL="http://localhost:3000"
 | `AUTH_SECRET` / `AUTH_URL` | Auth.js session |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | Optional Google login |
 | `SMTP_*` / `EMAIL_FROM` | Optional real email for nudges & resets |
+| `SEMANTIC_SCHOLAR_API_KEY` | Optional — higher Find-papers quota (unauthenticated S2 is 429-prone) |
 | `LLM_API_KEY` | Optional — enables LLM Referee / Coach |
 | `LLM_BASE_URL` | Default `https://api.groq.com/openai/v1` |
 | `LLM_MODEL` | Default `openai/gpt-oss-20b` (Groq retired `llama-3.1-8b-instant`) |
@@ -254,6 +280,7 @@ Approving a **nudge** delivers it to the named student (SMTP or console) and cre
 | [docs/DATA.md](./docs/DATA.md) | Structured submissions pipeline |
 | [docs/WORKERS.md](./docs/WORKERS.md) | BullMQ worker notes |
 | [docs/PHASES.md](./docs/PHASES.md) | Build phases |
+| [docs/PHASE7-WALKTHROUGH.md](./docs/PHASE7-WALKTHROUGH.md) | Director + student walkthrough · 10 friction notes |
 | [docs/DESIGN.md](./docs/DESIGN.md) | Design system · light/dark tokens |
 | [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) | $0 self-host, Gmail SMTP, Google OAuth |
 | [docs/diagrams/](./docs/diagrams/) | C4 / ops Mermaid diagrams |
