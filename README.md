@@ -1,4 +1,4 @@
-# LabCrew
+<img width="1624" height="950" alt="image" src="https://github.com/user-attachments/assets/6811a084-88fc-4fd9-931f-8ff4d7036e1e" /># LabCrew
 
 **Your lab’s AI operations crew.**  
 Humans direct. Agents collect signals, score evidence, draft nudges, and prepare the Monday briefing — nothing reaches students until you approve.
@@ -15,6 +15,16 @@ Humans direct. Agents collect signals, score evidence, draft nudges, and prepare
 </p>
 
 <img width="1539" height="956" alt="image" src="https://github.com/user-attachments/assets/bbf07ebb-1d43-4a01-95e6-6ceec6b6f80a" />
+<img width="1694" height="953" alt="image" src="https://github.com/user-attachments/assets/5f9c581d-c665-4df8-851e-2210030d6686" />
+<img width="1553" height="955" alt="image" src="https://github.com/user-attachments/assets/81125dfc-5ddb-4cbb-a46a-53496e234284" />
+<img width="1624" height="950" alt="image" src="https://github.com/user-attachments/assets/ba89f290-b263-4bb5-9cb3-d5196e03b4af" />
+<img width="1662" height="949" alt="image" src="https://github.com/user-attachments/assets/4121ed60-707d-42d1-be0c-c0f0b426eccb" />
+<img width="1696" height="952" alt="image" src="https://github.com/user-attachments/assets/adfaa1f1-7d0a-4906-b635-6763c8a564a0" />
+<img width="1664" height="950" alt="image" src="https://github.com/user-attachments/assets/08dd0061-6bfe-4aa6-9ee3-1aae47201d74" />
+
+
+
+
 
 <br/>
 
