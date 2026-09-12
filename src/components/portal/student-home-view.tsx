@@ -49,6 +49,13 @@ type Home = {
       decidedAt: string | null;
     } | null;
   };
+  nextStep?: {
+    kind: string;
+    title: string;
+    reason: string;
+    href: string;
+    assignmentId?: string;
+  };
 };
 
 function when(iso: string) {
@@ -127,6 +134,25 @@ export function StudentHomeView() {
               what&apos;s next in the lab.
             </p>
           </div>
+
+          {home.nextStep ? (
+            <section className="rounded-[16px] border border-[var(--lc-line)] bg-lc-surface px-5 py-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-lc-muted">
+                Do this next
+              </p>
+              <p className="mt-2 text-xl font-semibold tracking-tight">{home.nextStep.title}</p>
+              <p className="mt-2 text-sm leading-relaxed text-lc-muted">
+                {home.nextStep.reason}
+              </p>
+              <div className="mt-4">
+                <Link href={home.nextStep.href}>
+                  <Button variant="accent" size="sm">
+                    Open
+                  </Button>
+                </Link>
+              </div>
+            </section>
+          ) : null}
 
           {home.coach ? (
             <section className="space-y-3">
@@ -312,6 +338,18 @@ export function StudentHomeView() {
                 ))}
               </ul>
             )}
+          </section>
+
+          <section className="rounded-[14px] border border-[var(--lc-line)] bg-lc-surface px-4 py-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-lc-muted">
+              Field kit
+            </p>
+            <p className="mt-1 text-sm font-medium">Collect on your phone</p>
+            <p className="mt-1 text-xs leading-relaxed text-lc-muted">
+              LabCrew Field is the offline companion: same lab, schema-validated
+              rows, charts with privacy floors. See{" "}
+              <code className="text-[11px]">apps/mobile</code> in the repo.
+            </p>
           </section>
         </div>
       ) : null}

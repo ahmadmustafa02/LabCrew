@@ -8,6 +8,11 @@ import type {
 } from "@/lib/assignment-types";
 import { groupCellsToTable, parseDataSchema } from "@/server/data/submission-data";
 import {
+  replaceAssignees,
+  resolveStudentTargets,
+  studentAssignedToMilestone,
+} from "@/server/assignments/audience";
+import {
   requireLabDirector,
   requireLabScope,
 } from "@/server/tenancy/lab-scope";
@@ -39,11 +44,26 @@ export async function GET(request: Request, { params }: Params) {
     const isDirector = gate.ctx.appRole === "director";
     const myMemberId = gate.ctx.membership.id;
 
+    if (!isDirector) {
+      const allowed = await studentAssignedToMilestone({
+        labId: gate.ctx.labId,
+        milestoneId: assignment.id,
+        memberId: myMemberId,
+        audience: assignment.audience,
+      });
+      if (!allowed) {
+        return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+      }
+    }
+
     const submissions = isDirector
       ? assignment.submissions
       : assignment.submissions.filter((s) => s.memberId === myMemberId);
 
-    const studentCount = assignment.program.members.length;
+    const studentCount =
+      assignment.audience === "SELECTED"
+        ? assignment.assignees.length
+        : assignment.program.members.length;
     const turnedIn = assignment.submissions.filter((s) =>
       ["SUBMITTED", "SCORED"].includes(s.status),
     ).length;
@@ -94,6 +114,13 @@ export async function GET(request: Request, { params }: Params) {
         coachResources: null,
         dueAt: assignment.dueAt,
         status: assignment.status,
+        audience: assignment.audience,
+        assigneeIds: assignment.assignees.map((a) => a.memberId),
+        assignees: assignment.assignees.map((a) => ({
+          memberId: a.memberId,
+          name: a.member.user.name,
+          email: a.member.user.email,
+        })),
         stats: {
           studentCount,
           turnedIn,
@@ -163,6 +190,8 @@ export async function PATCH(request: Request, { params }: Params) {
       materials?: MaterialItem[];
       rubric?: AssignmentRubric;
       dataSchema?: AssignmentDataSchema | null;
+      audience?: "ALL" | "SELECTED";
+      memberIds?: string[];
     };
 
     const title =
@@ -178,6 +207,22 @@ export async function PATCH(request: Request, { params }: Params) {
       body.dataSchema === undefined
         ? undefined
         : parseDataSchema(body.dataSchema);
+
+    const targets =
+      body.audience === undefined
+        ? null
+        : await resolveStudentTargets({
+            labId: gate.ctx.labId,
+            programId: existing.programId,
+            audience: body.audience,
+            memberIds: body.memberIds,
+          });
+    if (targets && !targets.ok) {
+      return NextResponse.json(
+        { ok: false, error: targets.error },
+        { status: targets.status },
+      );
+    }
 
     const prisma = getPrisma();
     const assignment = await prisma.milestone.update({
@@ -196,6 +241,7 @@ export async function PATCH(request: Request, { params }: Params) {
               ? new Date(body.dueAt)
               : null,
         status: body.status,
+        audience: targets?.audience,
         materials:
           body.materials === undefined
             ? undefined
@@ -212,6 +258,14 @@ export async function PATCH(request: Request, { params }: Params) {
               : Prisma.DbNull,
       },
     });
+    if (targets) {
+      await replaceAssignees({
+        labId: gate.ctx.labId,
+        milestoneId: existing.id,
+        audience: targets.audience,
+        memberIds: targets.memberIds,
+      });
+    }
 
     return NextResponse.json({ ok: true, assignment });
   } catch (error) {

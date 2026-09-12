@@ -12,6 +12,16 @@ import { cn } from "@/lib/cn";
 
 const DEMOS = [
   {
+    label: "Dr Basit Raza (director)",
+    email: "basit.raza@faculty.comsats.lab",
+    hint: "Walkthrough professor",
+  },
+  {
+    label: "Ahmad Mustafa (student)",
+    email: "ahmad.mustafa@students.comsats.lab",
+    hint: "Walkthrough student · COMSATS",
+  },
+  {
     label: "Director Reed",
     email: "director@northwater.lab",
     hint: "Seeded demo lab",

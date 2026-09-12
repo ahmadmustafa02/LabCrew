@@ -14,6 +14,7 @@ import {
   validateCsvHeadersAgainstSchema,
   type DataRowInput,
 } from "@/server/data/submission-data";
+import { studentAssignedToMilestone } from "@/server/assignments/audience";
 import { requireLabStudent } from "@/server/tenancy/lab-scope";
 import {
   findDataPointsForSubmissionInLab,
@@ -49,6 +50,19 @@ export async function GET(request: Request, { params }: Params) {
 
     const milestone = await findMilestoneInLab(labId, milestoneId);
     if (!milestone) {
+      return NextResponse.json(
+        { ok: false, error: "Assignment not found" },
+        { status: 404 },
+      );
+    }
+    if (
+      !(await studentAssignedToMilestone({
+        labId,
+        milestoneId,
+        memberId,
+        audience: milestone.audience,
+      }))
+    ) {
       return NextResponse.json(
         { ok: false, error: "Assignment not found" },
         { status: 404 },
@@ -115,6 +129,19 @@ export async function POST(request: Request, { params }: Params) {
 
     const milestone = await findMilestoneInLab(labId, milestoneId);
     if (!milestone) {
+      return NextResponse.json(
+        { ok: false, error: "Assignment not found" },
+        { status: 404 },
+      );
+    }
+    if (
+      !(await studentAssignedToMilestone({
+        labId,
+        milestoneId,
+        memberId,
+        audience: milestone.audience,
+      }))
+    ) {
       return NextResponse.json(
         { ok: false, error: "Assignment not found" },
         { status: 404 },

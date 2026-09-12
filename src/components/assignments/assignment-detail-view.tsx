@@ -4,6 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/session/session-provider";
+import { AssignmentFormFields, type StudentOpt } from "@/components/assignments/assignment-form-fields";
+import {
+  DEFAULT_ASSIGNMENT_FORM,
+  assignmentToForm,
+  formToPayload,
+  type AssignmentFormState,
+} from "@/lib/assignment-form";
 import type { AssignmentDataSchema, AssignmentRubric, MaterialItem } from "@/lib/assignment-types";
 import { cn } from "@/lib/cn";
 import { CohortDataPanel } from "@/components/assignments/cohort-data-panel";
@@ -93,6 +100,9 @@ type AssignmentDetail = {
   } | null;
   dueAt: string | null;
   status: string;
+  audience?: "ALL" | "SELECTED";
+  assigneeIds?: string[];
+  assignees?: { memberId: string; name: string; email: string }[];
   stats: {
     studentCount: number;
     turnedIn: number;
@@ -184,9 +194,9 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
   const [mySubmittedAt, setMySubmittedAt] = useState<string | null>(null);
   const [feedRefreshKey, setFeedRefreshKey] = useState(0);
   const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const [editInstructions, setEditInstructions] = useState("");
-  const [editDueAt, setEditDueAt] = useState("");
+  const [editForm, setEditForm] = useState<AssignmentFormState>(DEFAULT_ASSIGNMENT_FORM);
+  const [students, setStudents] = useState<StudentOpt[]>([]);
+  const [materialUploadBusy, setMaterialUploadBusy] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/assignments/${assignmentId}`);
@@ -197,22 +207,34 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
     }
     setAssignment(data.assignment);
     const a = data.assignment as AssignmentDetail;
-    setEditTitle(a.title ?? "");
-    setEditInstructions(a.instructions ?? a.description ?? "");
-    if (a.dueAt) {
-      const d = new Date(a.dueAt);
-      const pad = (n: number) => String(n).padStart(2, "0");
-      setEditDueAt(
-        `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
-      );
-    } else {
-      setEditDueAt("");
-    }
+    setEditForm(
+      assignmentToForm({
+        title: a.title,
+        description: a.description,
+        instructions: a.instructions,
+        dueAt: a.dueAt,
+        materials: a.materials,
+        rubric: a.rubric,
+        dataSchema: a.dataSchema,
+        audience: a.audience,
+        assigneeIds: a.assigneeIds,
+        dueAs: "datetime",
+      }),
+    );
   }, [assignmentId]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (role !== "director") return;
+    void (async () => {
+      const res = await fetch("/api/demo/members");
+      const data = await res.json();
+      if (data.ok) setStudents(data.students ?? []);
+    })();
+  }, [role]);
 
   useEffect(() => {
     if (role !== "student" || !studentMemberId || !assignment) return;
@@ -427,6 +449,13 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
               ? ` · ${materials.length} material${materials.length === 1 ? "" : "s"}`
               : ""}
             {late ? " · Late" : ""}
+            {role === "director"
+              ? assignment.audience === "SELECTED"
+                ? ` · ${assignment.assignees?.length ?? 0} student${
+                    (assignment.assignees?.length ?? 0) === 1 ? "" : "s"
+                  }`
+                : " · Everyone"
+              : ""}
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -563,20 +592,22 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
 
       {role === "director" && editing ? (
         <form
-          className="space-y-3 rounded-[14px] border border-[var(--lc-line)] bg-lc-surface p-5"
+          className="space-y-6"
           onSubmit={(e) => {
             e.preventDefault();
             void (async () => {
               setBusy(true);
               setError(null);
               try {
+                const payload = formToPayload(editForm);
                 const res = await fetch(`/api/assignments/${assignmentId}`, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
-                    title: editTitle,
-                    instructions: editInstructions,
-                    dueAt: editDueAt ? new Date(editDueAt).toISOString() : null,
+                    ...payload,
+                    dueAt: editForm.dueAt
+                      ? new Date(editForm.dueAt).toISOString()
+                      : null,
                   }),
                 });
                 const data = await res.json();
@@ -596,35 +627,41 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
           }}
         >
           <p className="text-[15px] font-semibold text-lc-ink">Edit assignment</p>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-lc-muted">Title</span>
-            <input
-              className={inputClass}
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              required
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-lc-muted">
-              Instructions
-            </span>
-            <textarea
-              className={inputClass}
-              rows={4}
-              value={editInstructions}
-              onChange={(e) => setEditInstructions(e.target.value)}
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-lc-muted">Due</span>
-            <input
-              type="datetime-local"
-              className={inputClass}
-              value={editDueAt}
-              onChange={(e) => setEditDueAt(e.target.value)}
-            />
-          </label>
+          <AssignmentFormFields
+            value={editForm}
+            onChange={setEditForm}
+            dueType="datetime"
+            students={students}
+            uploadBusy={materialUploadBusy}
+            onUpload={(file) => {
+              void (async () => {
+                if (!file) return;
+                setMaterialUploadBusy(true);
+                setError(null);
+                try {
+                  const body = new FormData();
+                  body.set("file", file);
+                  body.set("title", file.name);
+                  const res = await fetch("/api/files/upload", {
+                    method: "POST",
+                    body,
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.ok) {
+                    throw new Error(data.error ?? "Upload failed");
+                  }
+                  setEditForm((prev) => ({
+                    ...prev,
+                    materials: [...prev.materials, data.material],
+                  }));
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Upload failed");
+                } finally {
+                  setMaterialUploadBusy(false);
+                }
+              })();
+            }}
+          />
           {error ? <p className="text-sm text-lc-danger">{error}</p> : null}
           <Button type="submit" variant="accent" disabled={busy}>
             {busy ? "Saving…" : "Save changes"}
@@ -913,7 +950,7 @@ export function AssignmentDetailView({ assignmentId }: { assignmentId: string })
             <div>
               <p className="text-xs font-medium text-lc-muted">Attachments</p>
               <p className="mt-0.5 text-sm text-lc-muted">
-                Upload attack docs, PDFs, notebooks, slides, or add external links.
+                Upload PDFs, notebooks, slides, or add external links.
               </p>
             </div>
 

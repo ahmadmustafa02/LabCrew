@@ -11,6 +11,7 @@ const DIRECTOR_ONLY = [
   "/app/analytics",
   "/app/team",
   "/app/assignments/new",
+  "/app/research",
 ];
 
 const STUDENT_ONLY = ["/app/home"];

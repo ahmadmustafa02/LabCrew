@@ -6,7 +6,7 @@ Accepted — Phase A (Engagement signal + score) + Phase B (nudge personalizatio
 
 ## Context
 
-LabCrew’s Coach drafts human-approved nudges from Pulse silence and Referee exceptions. That is blunt: two quiet students get the same tone, and Coach invents no reading list. Phase 5 extends Coach toward personalized interventions and real paper suggestions — **not** a difficulty / gamification recommender (there are no leveled exercises).
+LabCrew’s Coach drafts human-approved nudges from Pulse silence and Referee exceptions. That is blunt: two quiet students get the same tone, and Coach invents no reading list. Phase 5 extends Coach toward personalized interventions and real paper suggestions — **not** a difficulty / gamification recommender (there are no leveled exercises). Student Home also shows a separate **Do this next** rule (collect → writeup → catalog hold) in `src/server/coach/recommend.ts`.
 
 ## Decision
 

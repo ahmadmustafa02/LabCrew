@@ -1,8 +1,16 @@
 import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
 import { authConfig } from "@/auth.config";
+import { CORS_HEADERS } from "@/server/http/cors";
 
 const { auth } = NextAuth(authConfig);
+
+function withCors(response: NextResponse) {
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
 
 /**
  * Auth gate only. Onboarding completion is enforced in server layouts via
@@ -12,6 +20,13 @@ const { auth } = NextAuth(authConfig);
 export default auth((req) => {
   const isLoggedIn = Boolean(req.auth);
   const { pathname } = req.nextUrl;
+
+  if (pathname.startsWith("/api")) {
+    if (req.method === "OPTIONS") {
+      return withCors(new NextResponse(null, { status: 204 }));
+    }
+    return withCors(NextResponse.next());
+  }
 
   if (pathname.startsWith("/app") && !isLoggedIn) {
     const url = new URL("/login", req.nextUrl.origin);
@@ -24,12 +39,14 @@ export default auth((req) => {
   }
 
   if ((pathname === "/login" || pathname === "/signup") && isLoggedIn) {
-    return NextResponse.redirect(new URL("/app", req.nextUrl.origin));
+    const next = req.nextUrl.searchParams.get("next");
+    const dest = next && next.startsWith("/app") ? next : "/app";
+    return NextResponse.redirect(new URL(dest, req.nextUrl.origin));
   }
 
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: ["/app/:path*", "/login", "/signup", "/onboarding"],
+  matcher: ["/app/:path*", "/login", "/signup", "/onboarding", "/api/:path*"],
 };

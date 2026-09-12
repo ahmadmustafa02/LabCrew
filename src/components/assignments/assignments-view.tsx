@@ -32,6 +32,7 @@ type Assignment = {
   myStatus: string | null;
   myReviewStatus: string | null;
   materials?: MaterialItem[] | null;
+  assignedLabel?: string;
 };
 
 const TABS: Array<{ id: AssignmentBucket; label: string }> = [
@@ -224,11 +225,18 @@ export function AssignmentsView() {
           {error ? <p className="mt-2 text-sm text-lc-danger">{error}</p> : null}
         </div>
         {role === "director" && !studentLabHint ? (
-          <Link href="/app/assignments/new">
-            <Button variant="accent" size="md">
-              New assignment
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/app/research/new">
+              <Button variant="accent" size="md">
+                Plan from a topic
+              </Button>
+            </Link>
+            <Link href="/app/assignments/new">
+              <Button variant="secondary" size="md">
+                New assignment
+              </Button>
+            </Link>
+          </div>
         ) : null}
       </div>
 
@@ -277,8 +285,13 @@ export function AssignmentsView() {
                 </p>
                 {role === "director" && !studentLabHint ? (
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    <Link href="/app/assignments/new">
+                    <Link href="/app/research/new">
                       <Button variant="accent" size="md">
+                        Plan from a topic
+                      </Button>
+                    </Link>
+                    <Link href="/app/assignments/new">
+                      <Button variant="secondary" size="md">
                         New assignment
                       </Button>
                     </Link>
@@ -333,6 +346,9 @@ export function AssignmentsView() {
                                 : formatDueLabel(item.dueAt)}
                               {item.materialCount > 0
                                 ? ` · ${item.materialCount} material${item.materialCount === 1 ? "" : "s"}`
+                                : ""}
+                              {role === "director" && item.assignedLabel
+                                ? ` · ${item.assignedLabel}`
                                 : ""}
                             </p>
                             {programName ? (

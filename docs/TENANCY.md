@@ -33,6 +33,7 @@ System overview: [SYSTEM.md](./SYSTEM.md).
 | -------- | ------ |
 | Scoped to a single lab? | **Yes.** Token row stores `organizationId`. `resolveLabContext` reloads membership with `organizationId: expectedLabId` — mismatch → null. `labId` always comes from the token/membership, never the client body. |
 | Expire? | **Yes.** Default **90 days**. Tests may pass `expiresAt: null`. Expired / revoked → resolve fails. |
+| Issue path? | **Yes.** `POST /api/auth/mobile/login` (email + password → plaintext once) and `POST /api/auth/tokens` (already-authenticated session). |
 | Revoke path? | **Yes.** `revokeApiAccessToken(id, labId)` + `DELETE /api/auth/tokens/[id]` (lab + user scoped). `GET /api/auth/tokens` lists metadata only (no plaintext). |
 | Rate limit? | **Yes, bearer-only.** Sliding window in `requireLabScope` via `checkBearerRateLimit` (120 req / 60s per token hash). Session cookies are not covered by this limiter. |
 

@@ -8,6 +8,7 @@ import {
   SubmissionStatus,
 } from "@prisma/client";
 import { getPrisma } from "@/lib/db";
+import { studentMilestoneWhere } from "@/server/assignments/audience";
 import { inLab } from "@/server/tenancy/lab-scope";
 
 export type StudentProgress = {
@@ -117,6 +118,7 @@ export async function loadStudentProgress(input: {
     where: {
       programId: input.programId,
       ...inLab(input.labId),
+      ...studentMilestoneWhere(input.memberId),
       status: {
         in: [
           MilestoneStatus.ACTIVE,
