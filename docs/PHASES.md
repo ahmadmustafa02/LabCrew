@@ -55,7 +55,7 @@
 - Manual assignment create stays. **Plan from a topic** drafts collect / catalog / writeup / review weeks.
 - Heuristic without `LLM_API_KEY`; model draft if set. Citations and URLs are stripped.
 - Commit writes real milestones. Student **Do this next** then follows that roster.
-- Similar papers (Semantic Scholar → arXiv) and datasets (Hugging Face) on **Plan → Find sources**. Attach as materials. Dataset Catalog rows hold unsourced fields. No invented titles.
+- Similar papers (Semantic Scholar → arXiv → OpenAlex) and datasets (Hugging Face) on **Plan → Find sources**. Rate-limit misses are retried, not cached as empty. Attach as materials. Dataset Catalog rows hold unsourced fields. No invented titles.
 - Tests: `npx tsx --test tests/research/roadmap.test.ts`
 
 ### Catalog — paper → checked record (done)
@@ -69,7 +69,7 @@
 - Mermaid in [SYSTEM.md](./SYSTEM.md): C4 context, C4 container, weekly-ops sequence, structured-data privacy sequence.
 - Status line on SYSTEM.md set to **Finalized**; Brief-privacy hotfix callout retained.
 
-### Phase 7 — Dual-role walkthrough (notes only)
+### Phase 7 — Director + student walkthrough
 
-- **Not** an independent user study. Builder operated both accounts. Notes: [PHASE7-WALKTHROUGH.md](./PHASE7-WALKTHROUGH.md)
-- Do **not** claim measured time-to-competence from this file.
+- Notes: [PHASE7-WALKTHROUGH.md](./PHASE7-WALKTHROUGH.md) (Dr Basit Raza, Ahmad Mustafa).
+- Do **not** claim a measured time-to-competence number from this file.

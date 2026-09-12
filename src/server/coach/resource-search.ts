@@ -1,27 +1,65 @@
 /**
  * Adaptive Coach Phase C — retrieval only (no LLM invent).
- * Semantic Scholar primary; arXiv Atom API fallback.
+ * Semantic Scholar primary; arXiv then OpenAlex fallback. Never invent titles.
  */
+
+export type PaperSource = "semanticscholar" | "arxiv" | "openalex";
 
 export type RetrievedPaper = {
   title: string;
   url: string;
   year: number | null;
   venue: string | null;
-  source: "semanticscholar" | "arxiv";
+  source: PaperSource;
   paperId: string;
 };
 
 const S2_FIELDS = "paperId,title,url,year,venue,externalIds";
 const FETCH_MS = 12_000;
 const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
+const USER_AGENT = "LabCrew/0.1 (research-lab-ops; +http://localhost:3000)";
+
+function paperHeaders(extra?: Record<string, string>): Headers {
+  const headers = new Headers(extra);
+  headers.set("User-Agent", USER_AGENT);
+  return headers;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchPolite(url: URL | string, init: RequestInit, retries = 1) {
+  let last: Response | undefined;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const headers = paperHeaders(
+      init.headers instanceof Headers
+        ? Object.fromEntries(init.headers.entries())
+        : (init.headers as Record<string, string> | undefined),
+    );
+    const res = await fetch(url, {
+      ...init,
+      headers,
+      signal: init.signal ?? AbortSignal.timeout(FETCH_MS),
+    });
+    if (res.status !== 429 && res.status !== 503) return res;
+    last = res;
+    const retryAfter = Number(res.headers.get("retry-after"));
+    const waitMs =
+      Number.isFinite(retryAfter) && retryAfter > 0
+        ? Math.min(retryAfter * 1000, 8000)
+        : 1200 * (attempt + 1);
+    await sleep(waitMs);
+  }
+  return last!;
+}
 
 type CacheEntry = {
   expiresAt: number;
   value: {
     query: string;
     papers: RetrievedPaper[];
-    primarySource: "semanticscholar" | "arxiv" | "none";
+    primarySource: PaperSource | "none";
     error?: string;
   };
 };
@@ -30,6 +68,11 @@ const searchCache = new Map<string, CacheEntry>();
 
 function cleanQuery(raw: string) {
   return raw.replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+function compactQuery(query: string) {
+  const tokens = significantTokens(query);
+  return tokens.slice(0, 4).join(" ") || query;
 }
 
 function isHttpUrl(v: string) {
@@ -46,14 +89,15 @@ async function searchSemanticScholar(
   limit: number,
 ): Promise<RetrievedPaper[]> {
   const url = new URL("https://api.semanticscholar.org/graph/v1/paper/search");
-  url.searchParams.set("query", query);
+  url.searchParams.set("query", compactQuery(query));
   url.searchParams.set("limit", String(limit));
   url.searchParams.set("fields", S2_FIELDS);
 
-  const res = await fetch(url, {
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(FETCH_MS),
-  });
+  const extra: Record<string, string> = { Accept: "application/json" };
+  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY?.trim();
+  if (apiKey) extra["x-api-key"] = apiKey;
+
+  const res = await fetchPolite(url, { headers: extra });
   if (!res.ok) {
     throw new Error(`Semantic Scholar HTTP ${res.status}`);
   }
@@ -104,15 +148,21 @@ function decodeXml(s: string) {
 }
 
 async function searchArxiv(query: string, limit: number): Promise<RetrievedPaper[]> {
-  const url = new URL("http://export.arxiv.org/api/query");
-  url.searchParams.set("search_query", `all:${query}`);
+  const url = new URL("https://export.arxiv.org/api/query");
+  const tokens = significantTokens(query);
+  const arxivQ =
+    tokens.length >= 2
+      ? `all:"${tokens.slice(0, 3).join(" ")}"`
+      : `all:${compactQuery(query)}`;
+  url.searchParams.set("search_query", arxivQ);
   url.searchParams.set("start", "0");
   url.searchParams.set("max_results", String(limit));
 
-  const res = await fetch(url, {
-    headers: { Accept: "application/atom+xml" },
-    signal: AbortSignal.timeout(FETCH_MS),
-  });
+  const res = await fetchPolite(
+    url,
+    { headers: { Accept: "application/atom+xml" } },
+    0,
+  );
   if (!res.ok) throw new Error(`arXiv HTTP ${res.status}`);
   const xml = await res.text();
 
@@ -134,6 +184,53 @@ async function searchArxiv(query: string, limit: number): Promise<RetrievedPaper
       venue: "arXiv",
       source: "arxiv",
       paperId: arxivId,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+async function searchOpenAlex(query: string, limit: number): Promise<RetrievedPaper[]> {
+  const url = new URL("https://api.openalex.org/works");
+  url.searchParams.set("search", compactQuery(query));
+  url.searchParams.set("per_page", String(limit));
+
+  const res = await fetchPolite(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`OpenAlex HTTP ${res.status}`);
+  const json = (await res.json()) as {
+    results?: Array<{
+      id?: string;
+      title?: string;
+      display_name?: string;
+      publication_year?: number;
+      doi?: string | null;
+      primary_location?: {
+        landing_page_url?: string | null;
+        source?: { display_name?: string | null };
+      };
+    }>;
+  };
+
+  const out: RetrievedPaper[] = [];
+  for (const row of json.results ?? []) {
+    const title = (row.display_name ?? row.title ?? "").trim();
+    const id = (row.id ?? "").replace("https://openalex.org/", "").trim();
+    if (!title || !id) continue;
+    const doi = row.doi && isHttpUrl(row.doi) ? row.doi : null;
+    const landing =
+      row.primary_location?.landing_page_url &&
+      isHttpUrl(row.primary_location.landing_page_url)
+        ? row.primary_location.landing_page_url
+        : null;
+    const link = landing || doi || `https://openalex.org/${id}`;
+    if (!isHttpUrl(link)) continue;
+    out.push({
+      title,
+      url: link,
+      year: typeof row.publication_year === "number" ? row.publication_year : null,
+      venue: row.primary_location?.source?.display_name?.trim() || "OpenAlex",
+      source: "openalex",
+      paperId: id,
     });
     if (out.length >= limit) break;
   }
@@ -209,7 +306,7 @@ export async function searchPapersForTopic(
 ): Promise<{
   query: string;
   papers: RetrievedPaper[];
-  primarySource: "semanticscholar" | "arxiv" | "none";
+  primarySource: PaperSource | "none";
   error?: string;
   cacheHit?: boolean;
 }> {
@@ -224,10 +321,10 @@ export async function searchPapersForTopic(
     return { ...cached.value, cacheHit: true };
   }
 
-  async function finalize(
+  function finalize(
     papers: RetrievedPaper[],
-    primarySource: "semanticscholar" | "arxiv",
-    error?: string,
+    primarySource: PaperSource,
+    priorError?: string,
   ) {
     const filtered = filterRelevantPapers(query, papers).slice(0, limit);
     return {
@@ -236,53 +333,43 @@ export async function searchPapersForTopic(
       primarySource: filtered.length ? primarySource : ("none" as const),
       error:
         filtered.length === 0
-          ? error ?? "No relevant titles matched the query tokens"
+          ? priorError ?? "No relevant titles matched the query tokens"
           : undefined,
     };
   }
 
-  let result: {
-    query: string;
-    papers: RetrievedPaper[];
-    primarySource: "semanticscholar" | "arxiv" | "none";
-    error?: string;
-  };
-
-  try {
-    const papers = await searchSemanticScholar(query, limit);
-    if (papers.length > 0) {
-      result = await finalize(papers, "semanticscholar");
-    } else {
-      try {
-        const arxivPapers = await searchArxiv(query, limit);
-        result = await finalize(arxivPapers, "arxiv");
-      } catch (err) {
-        result = {
-          query,
-          papers: [],
-          primarySource: "none",
-          error: err instanceof Error ? err.message : "arXiv failed",
-        };
-      }
-    }
-  } catch (err) {
-    const s2Error = err instanceof Error ? err.message : "S2 failed";
+  const errors: string[] = [];
+  async function trySource(
+    name: PaperSource,
+    run: () => Promise<RetrievedPaper[]>,
+  ) {
     try {
-      const papers = await searchArxiv(query, limit);
-      result = await finalize(papers, "arxiv", s2Error);
-    } catch (err2) {
-      result = {
-        query,
-        papers: [],
-        primarySource: "none",
-        error: `${s2Error}; ${err2 instanceof Error ? err2.message : "arXiv failed"}`,
-      };
+      const papers = await run();
+      const done = finalize(papers, name);
+      if (done.papers.length > 0) return done;
+      errors.push(`${name}: no title overlap`);
+    } catch (err) {
+      errors.push(err instanceof Error ? err.message : `${name} failed`);
     }
+    return null;
   }
 
-  searchCache.set(cacheKey, {
-    expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
-    value: result,
-  });
+  const result =
+    (await trySource("semanticscholar", () => searchSemanticScholar(query, limit))) ??
+    (await trySource("arxiv", () => searchArxiv(query, limit))) ??
+    (await trySource("openalex", () => searchOpenAlex(query, limit))) ?? {
+      query,
+      papers: [],
+      primarySource: "none" as const,
+      error: errors.join("; ") || "No matching titles",
+    };
+
+  const rateLimited = Boolean(result.error && /HTTP 429/.test(result.error));
+  if (result.papers.length > 0 || !rateLimited) {
+    searchCache.set(cacheKey, {
+      expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+      value: result,
+    });
+  }
   return { ...result, cacheHit: false };
 }

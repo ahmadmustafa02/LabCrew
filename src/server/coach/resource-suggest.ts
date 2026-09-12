@@ -18,7 +18,7 @@ export type SuggestedResource = {
   url: string;
   year: number | null;
   venue: string | null;
-  source: "semanticscholar" | "arxiv";
+  source: RetrievedPaper["source"];
   paperId: string;
   rationale: string;
 };
@@ -27,7 +27,7 @@ export type ResourceDraftPayload = {
   milestoneId: string;
   query: string;
   status: "found" | "empty";
-  primarySource: "semanticscholar" | "arxiv" | "none";
+  primarySource: RetrievedPaper["source"] | "none";
   items: SuggestedResource[];
   note: string;
 };

@@ -4,23 +4,25 @@ import { requireLabDirector } from "@/server/tenancy/lab-scope";
 
 export const runtime = "nodejs";
 
-type Params = { params: Promise<{ id: string }> };
-
-export async function POST(request: Request, { params }: Params) {
+export async function POST(request: Request) {
   try {
     const gate = await requireLabDirector(request);
     if ("error" in gate) return gate.error;
 
-    const { id } = await params;
-    const body = (await request.json().catch(() => ({}))) as {
+    const body = (await request.json()) as {
+      planId?: string;
       kind?: string;
       query?: string;
     };
+    const planId = body.planId?.trim() ?? "";
+    if (!planId) {
+      return NextResponse.json({ ok: false, error: "Missing plan" }, { status: 400 });
+    }
 
     const result = await runSourceSearch({
       labId: gate.ctx.labId,
       programId: gate.ctx.membership.programId,
-      planId: id,
+      planId,
       kind: body.kind,
       query: body.query,
     });

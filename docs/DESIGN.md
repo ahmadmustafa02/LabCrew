@@ -70,4 +70,4 @@ Tone: calm, specific, respectful of research time. Prefer verbs like *open*, *no
 
 **Who has what** is starter homework plus a sign-out list. It is not a purchase or calibration system.
 
-Dual-role click-through notes (not an independent user study): [PHASE7-WALKTHROUGH.md](./PHASE7-WALKTHROUGH.md).
+Director + student walkthrough notes: [PHASE7-WALKTHROUGH.md](./PHASE7-WALKTHROUGH.md).

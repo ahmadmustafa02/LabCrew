@@ -71,7 +71,6 @@ abstract final class LcTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: scheme,
-      fontFamily: 'Segoe UI',
     );
 
     return base.copyWith(
@@ -90,9 +89,7 @@ abstract final class LcTheme {
         titleTextStyle: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          letterSpacing: -0.3,
           color: ink,
-          fontFamily: 'Segoe UI',
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -106,15 +103,14 @@ abstract final class LcTheme {
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
             color: selected ? accent : muted,
-            fontFamily: 'Segoe UI',
           );
         }),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: panel,
-        hintStyle: TextStyle(color: muted, fontFamily: 'Segoe UI'),
-        labelStyle: TextStyle(color: muted, fontWeight: FontWeight.w500, fontFamily: 'Segoe UI'),
+        hintStyle: TextStyle(color: muted),
+        labelStyle: TextStyle(color: muted, fontWeight: FontWeight.w500),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -142,7 +138,6 @@ abstract final class LcTheme {
           textStyle: const TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 16,
-            fontFamily: 'Segoe UI',
           ),
         ),
       ),
@@ -152,13 +147,13 @@ abstract final class LcTheme {
           foregroundColor: ink,
           side: BorderSide(color: line),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16, fontFamily: 'Segoe UI'),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: elevated,
-        contentTextStyle: TextStyle(color: ink, fontFamily: 'Segoe UI'),
+        contentTextStyle: TextStyle(color: ink),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       extensions: [

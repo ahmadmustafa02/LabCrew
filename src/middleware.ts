@@ -39,7 +39,9 @@ export default auth((req) => {
   }
 
   if ((pathname === "/login" || pathname === "/signup") && isLoggedIn) {
-    return NextResponse.redirect(new URL("/app", req.nextUrl.origin));
+    const next = req.nextUrl.searchParams.get("next");
+    const dest = next && next.startsWith("/app") ? next : "/app";
+    return NextResponse.redirect(new URL(dest, req.nextUrl.origin));
   }
 
   return NextResponse.next();

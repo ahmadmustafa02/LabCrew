@@ -54,7 +54,7 @@ Research cohorts drown in Slack threads, missing demos, and silent students. Lab
 - **Monday Brief** — compiled briefing, standup agenda, cohort data summary, Markdown / print export  
 - **Mission Control** — dispatch Pulse → Referee → Coach → Clerk  
 - **Assignments** — materials, rubrics, structured data schemas, open/close/reopen, Teams-style list + detail  
-- **Plan** — director types a research topic; LabCrew drafts milestones; nothing is assigned until they add it. **Find sources** on a plan: similar papers (S2/arXiv) and hub datasets (Hugging Face). Attach as materials; Catalog fields stay held without a quote.  
+- **Plan** — director types a research topic; LabCrew drafts milestones; nothing is assigned until they add it. **Find sources** on a plan: similar papers (Semantic Scholar → arXiv → OpenAlex) and hub datasets (Hugging Face). Rate-limit misses are retried, not cached as “no papers.” Attach as materials; Catalog fields stay held without a quote.  
 - **Who has what** — starter homework for a new student, plus who took which lab thing and when it is due back.  
 - **Approvals** — edit / approve / reject **nudge** drafts (email + in-app note when approved; SMTP when configured)  
 - **Meetings · Messages · Announcements · Analytics · Team** (invites, roles, revoke)
@@ -175,7 +175,18 @@ Full free-host notes: [docs/DEPLOY-FREE.md](./docs/DEPLOY-FREE.md) · Administra
 
 Seeded demo password (if you ran `npm run db:seed`): `labcrew`
 
-Walkthrough accounts (same password): `basit.raza@faculty.comsats.lab` (director), `ahmad.mustafa@students.comsats.lab` (student). Notes: [docs/PHASE7-WALKTHROUGH.md](./docs/PHASE7-WALKTHROUGH.md) — dual-role builder walkthrough, not a measured user study.
+Walkthrough accounts (same password): `basit.raza@faculty.comsats.lab` (Dr Basit Raza, director), `ahmad.mustafa@students.comsats.lab` (Ahmad Mustafa, student). Notes: [docs/PHASE7-WALKTHROUGH.md](./docs/PHASE7-WALKTHROUGH.md).
+
+Per-professor demo stories (same host as the app):
+
+- `/demo` — index
+- `/demo/resops` — Who has what (#1 Manai)
+- `/demo/dataforge` — collect (#2 Cao)
+- `/demo/catalog` — paper → record (#7 Livingstone)
+- `/demo/next-step` — student Home (#4 honest)
+- `/demo/plan` — topic + Find sources
+
+On this machine: `http://localhost:3000/demo`. A public URL needs a deploy of this app + Postgres.
 
 ---
 

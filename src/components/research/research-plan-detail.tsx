@@ -59,10 +59,10 @@ export function ResearchPlanDetail({ planId }: { planId: string }) {
     setBusy(kind);
     setError(null);
     try {
-      const res = await fetch(`/api/research/plans/${planId}/find`, {
+      const res = await fetch("/api/research/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind }),
+        body: JSON.stringify({ planId, kind }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error ?? "Search failed");
@@ -129,7 +129,7 @@ export function ResearchPlanDetail({ planId }: { planId: string }) {
           {topic || "This plan"}
         </p>
         <p className="mt-2 text-sm text-lc-muted">
-          Papers from Semantic Scholar / arXiv. Datasets from Hugging Face.
+          Papers from Semantic Scholar / arXiv / OpenAlex. Datasets from Hugging Face.
           Empty is honest. Attach only what you want students to see.
         </p>
       </div>
